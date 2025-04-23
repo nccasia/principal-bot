@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MezonClientConfig } from '../dtos/mezon-client-config';
 import { MezonClient } from 'mezon-sdk';
 
+// TODO: Implement the MezonClientService to handle client operations
 @Injectable()
 export class MezonClientService {
   private readonly logger = new Logger(MezonClientService.name);
@@ -13,7 +14,7 @@ export class MezonClientService {
 
   initializeClient() {
     try {
-      // const result = await this.client.authenticate(); // Not yet implemented
+      // const result = await this.client.authenticate();
       return 'Client initialized successfully';
     } catch (error) {
       this.logger.error('Error initializing Mezon client', error);

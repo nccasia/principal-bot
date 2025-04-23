@@ -3,60 +3,24 @@ import {
   EmbedProps,
   MEZON_EMBED_FOOTER,
 } from 'src/bot/commands/asterisk/config/config';
-import { getRandomColor } from 'src/bot/utils/helper';
+import { COLORS } from 'src/bot/utils/helper';
 import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
 import { EMessageComponentType } from 'mezon-sdk';
+import {
+  branchOptions,
+  candidateTypesOptions,
+  cvSourceOptions,
+  genderOptions,
+  positionOptions,
+} from './apply-cv.constant';
 
 @Command('apply-cv')
 export class ApplyCVCommand {
   constructor(private readonly clientConfigService: MezonClientConfig) {}
 
-  candidateTypesOptions = [
-    { label: 'Internship', value: 'internship' },
-    { label: 'Fresher', value: 'fresher' },
-    { label: 'Junior', value: 'junior' },
-    { label: 'Mid', value: 'mid' },
-    { label: 'Senior', value: 'senior' },
-  ];
-
-  positionOptions = [
-    { label: 'NodeJs Developer', value: 'nodejs' },
-    { label: 'ReactJs Developer', value: 'reactjs' },
-    { label: 'FullStack Developer', value: 'fullstack' },
-    { label: 'QA Engineer', value: 'qa' },
-    { label: 'DevOps Engineer', value: 'devops' },
-    { label: 'UI/UX Designer', value: 'uiux' },
-    { label: 'Project Manager', value: 'pm' },
-  ];
-
-  branchOptions = [
-    { label: 'Hà Nội 1', value: 'hn1' },
-    { label: 'Hà Nội 2', value: 'hn2' },
-    { label: 'Hà Nội 3', value: 'hn3' },
-    { label: 'Vinh', value: 'vinh' },
-    { label: 'Đà Nẵng', value: 'danang' },
-    { label: 'Hồ Chí Minh', value: 'saigon' },
-    { label: 'Quy Nhơn', value: 'quynhon' },
-  ];
-
-  // CV Source options
-  cvSourceOptions = [
-    { label: 'LinkedIn', value: 'linkedin' },
-    { label: 'Facebook', value: 'facebook' },
-    { label: 'Zalo', value: 'zalo' },
-    { label: 'Referral', value: 'referral' },
-    { label: 'TopCV', value: 'topcv' },
-    { label: 'Other', value: 'other' },
-  ];
-
-  genderOptions = [
-    { lable: 'Male', value: 'male' },
-    { lable: 'Female', value: 'female' },
-  ];
-
   embed: EmbedProps[] = [
     {
-      color: getRandomColor(),
+      color: COLORS.Aqua,
       title: `Candidate Application Form`,
       fields: [
         {
@@ -107,9 +71,9 @@ export class ApplyCVCommand {
             id: `applycv-${messageid}-candidate-type`,
             type: EMessageComponentType.SELECT,
             component: {
-              options: this.candidateTypesOptions,
+              options: candidateTypesOptions,
               required: true,
-              valueSelected: this.candidateTypesOptions[0],
+              valueSelected: candidateTypesOptions[0],
             },
           },
         },
@@ -120,9 +84,9 @@ export class ApplyCVCommand {
             id: `applycv-${messageid}-position`,
             type: EMessageComponentType.SELECT,
             component: {
-              options: this.positionOptions,
+              options: positionOptions,
               required: true,
-              valueSelected: this.positionOptions[0],
+              valueSelected: positionOptions[0],
             },
           },
         },
@@ -133,9 +97,9 @@ export class ApplyCVCommand {
             id: `applycv-${messageid}-branch`,
             type: EMessageComponentType.SELECT,
             component: {
-              options: this.branchOptions,
+              options: branchOptions,
               required: true,
-              valueSelected: this.branchOptions[0],
+              valueSelected: branchOptions[0],
             },
           },
         },
@@ -146,9 +110,9 @@ export class ApplyCVCommand {
             id: `applycv-${messageid}-cv-source`,
             type: EMessageComponentType.SELECT,
             component: {
-              options: this.cvSourceOptions,
+              options: cvSourceOptions,
               required: true,
-              valueSelected: this.cvSourceOptions[0],
+              valueSelected: cvSourceOptions[0],
             },
           },
         },
@@ -173,9 +137,9 @@ export class ApplyCVCommand {
             id: `applycv-${messageid}-gender`,
             type: EMessageComponentType.SELECT,
             component: {
-              options: this.genderOptions,
+              options: genderOptions,
               required: false,
-              valueSelected: this.genderOptions[0],
+              valueSelected: genderOptions[0],
             },
           },
         },
