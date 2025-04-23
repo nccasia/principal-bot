@@ -39,13 +39,13 @@ export class ApplyCVCommand {
     { label: 'Quy Nhơn', value: 'quynhon' },
   ];
 
-  // Em chưa hiểu cv source là như thế nào
+  // CV Source options
   cvSourceOptions = [
     { label: 'LinkedIn', value: 'linkedin' },
     { label: 'Facebook', value: 'facebook' },
     { label: 'Zalo', value: 'zalo' },
     { label: 'Referral', value: 'referral' },
-    { label: 'Website', value: 'website' },
+    { label: 'TopCV', value: 'topcv' },
     { label: 'Other', value: 'other' },
   ];
 
@@ -203,19 +203,6 @@ export class ApplyCVCommand {
               placeholder: 'Additional information',
               required: false,
               textarea: true,
-            },
-          },
-        },
-        {
-          name: 'CV Upload',
-          value: 'Please upload your CV file',
-          inputs: {
-            id: `applycv-${messageid}-cv-upload`,
-            // type: EMessageComponentType.FILE, không có định dạng là up file
-            component: {
-              id: `applycv-${messageid}-cv-upload-component`,
-              acceptTypes: '.pdf,.doc,.docx',
-              required: true,
             },
           },
         },
