@@ -18,19 +18,30 @@ import {
   positionOptions,
 } from './apply-cv.constant';
 import { CommandMessage } from 'src/bot/abstractions/commands/asterisk.abstract';
+import { MezonClientService } from 'src/mezon/services/client.service';
 
 @Command('apply-cv')
 export class ApplyCVCommand extends CommandMessage {
-  constructor(private readonly clientConfigService: MezonClientConfig) {
+  constructor(
+    private readonly clientConfigService: MezonClientConfig,
+    private readonly mezonClient: MezonClientService,
+  ) {
     super();
   }
 
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
     const attachments = message.attachments;
-    const isCorrectFileType = attachments.some(
-      (a) => a.filetype === 'pdf' || a.filetype === 'docx',
-    );
-    if (!isCorrectFileType) {
+    if (attachments.length > 1) {
+      return this.generateReplyMessage(
+        {
+          content: `Chỉ gửi 1 file duy nhất.`,
+        },
+        message,
+      );
+    }
+    const attachment = attachments[0];
+
+    if (attachment.filetype !== 'pdf' && attachment.filetype !== 'docx') {
       return this.generateReplyMessage(
         {
           content: `Chỉ chấp nhận định dạng PDF hoặc DOCX.`,
@@ -38,6 +49,7 @@ export class ApplyCVCommand extends CommandMessage {
         message,
       );
     }
+
     const messageid = message.id;
 
     const embed: EmbedProps[] = [
@@ -220,14 +232,13 @@ export class ApplyCVCommand extends CommandMessage {
         ],
       },
     ];
-    if (isCorrectFileType) {
-      return this.generateReplyMessage(
-        {
-          embed,
-          components,
-        },
-        message,
-      );
-    }
+
+    return this.generateReplyMessage(
+      {
+        embed,
+        components,
+      },
+      message,
+    );
   }
 }

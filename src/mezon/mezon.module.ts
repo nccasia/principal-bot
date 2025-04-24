@@ -3,6 +3,7 @@ import { MezonModuleAsyncOptions } from './dtos/mezon-module-async-options';
 import { MezonClientService } from './services/client.service';
 import { ConfigService } from '@nestjs/config';
 import { MezonClientConfig } from './dtos/mezon-client-config';
+// import { Asterisk } from 'src/bot/commands/asterisk/asterisk';
 
 @Global()
 @Module({})
@@ -14,14 +15,17 @@ export class MezonModule {
       providers: [
         {
           provide: MezonClientService,
-          useFactory: (configService: ConfigService) => {
+          useFactory: async (
+            configService: ConfigService,
+            // asterisk: Asterisk,
+          ) => {
             const clientConfig: MezonClientConfig = {
               token: configService.get<string>('MEZON_TOKEN'),
             };
 
             const client = new MezonClientService(clientConfig);
 
-            client.initializeClient();
+            await client.initializeClient();
 
             return client;
           },
