@@ -57,6 +57,13 @@ export class MezonClientService {
             message.attachments?.length > 0
           ) {
             this.logger.log('Processing apply-cv command with attachment');
+            const attachmentType = message.attachments[0].filetype;
+            if (attachmentType !== 'docx' && attachmentType !== 'pdf') {
+              channel_test.send({
+                t: `Sai định dang file. Vui lòng đính kèm file CV (.docx hoặc .pdf).`,
+              });
+            }
+
             try {
               const result = this.asterisk.execute(message.content.t, message);
               this.logger.log(`Command result: ${JSON.stringify(result)}`);
@@ -88,6 +95,14 @@ export class MezonClientService {
             this.logger.log(
               'File attached without command - suggesting apply-cv',
             );
+            channel_test.send({
+              t: `Vui lòng sử dụng lệnh *apply-cv và đính kèm 1 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
+            });
+          } else if (
+            message.content.t === '*apply-cv' &&
+            message.attachments.length === 0
+          ) {
+            this.logger.log('Command received without attachment');
             channel_test.send({
               t: `Vui lòng sử dụng lệnh *apply-cv và đính kèm 1 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
             });
