@@ -4,7 +4,6 @@ import {
   MEZON_EMBED_FOOTER,
 } from 'src/bot/commands/asterisk/config/config';
 import { COLORS } from 'src/bot/utils/helper';
-import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
 import {
   ChannelMessage,
   EButtonMessageStyle,

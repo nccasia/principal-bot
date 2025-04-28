@@ -49,10 +49,9 @@ export function generateReplyMessage(
       messageContent[key] = replayConent[key];
     }
   });
+  replyMessage.msg = replayConent;
 
-  replyMessage['msg'] = { ...messageContent };
-
-  replyMessage['ref'] = hasRef
+  replyMessage.ref = hasRef
     ? newRef?.length
       ? newRef
       : refGenerate(message)
