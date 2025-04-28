@@ -41,7 +41,7 @@ export class MezonClientService {
         const user = event.users[0];
         const channelName = event.channel_desc.clan_name;
         channel_test.send({
-          t: `Xin chào ${user.username}! Chào mừng bạn đến với kênh ${channelName}. Hãy sử dụng lệnh *apply-cv và đính kèm 01 file (.docx hoặc .pdf) để gửi CV của bạn.`,
+          t: `Xin chào ${user.username}! Chào mừng bạn đến với kênh ${channelName}. Hãy sử dụng lệnh *guicv và đính kèm 01 file (.docx hoặc .pdf) để gửi CV của bạn.`,
         });
       });
       this.client.onChannelMessage((message: ChannelMessage) => {
@@ -51,16 +51,26 @@ export class MezonClientService {
         console.log('Message received:', message);
 
         try {
-          // Trường hợp 1: Người dùng nhập *apply-cv VÀ đính kèm file
+          // Trường hợp 1: gửi quá nhiều file đính kèm
           if (
-            message.content?.t?.startsWith('*apply-cv') &&
+            message.attachments?.length > 1 &&
+            message.content.t?.startsWith('*')
+          ) {
+            channel_test.send({
+              t: `Vui lòng đính kèm DUY NHẤT 01 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
+            });
+          }
+
+          // Trường hợp 2: Người dùng nhập *guicv VÀ đính kèm file
+          else if (
+            message.content?.t?.startsWith('*') &&
             message.attachments?.length > 0
           ) {
-            this.logger.log('Processing apply-cv command with attachment');
+            this.logger.log('Processing guicv command with attachment');
             const attachmentType = message.attachments[0].filetype;
             if (attachmentType !== 'docx' && attachmentType !== 'pdf') {
               channel_test.send({
-                t: `Sai định dang file. Vui lòng đính kèm file CV (.docx hoặc .pdf).`,
+                t: `Sai định dang file. Vui lòng đính kèm 01 file CV (.docx hoặc .pdf).`,
               });
             }
 
@@ -87,24 +97,22 @@ export class MezonClientService {
             }
           }
 
-          // Trường hợp 2: Người dùng chỉ đính kèm file mà không gõ lệnh
+          // Trường hợp 3: Người dùng chỉ đính kèm file mà không gõ lệnh
           else if (
             message.attachments?.length > 0 &&
             !message.content?.t?.startsWith('*')
           ) {
-            this.logger.log(
-              'File attached without command - suggesting apply-cv',
-            );
+            this.logger.log('File attached without command - suggesting guicv');
             channel_test.send({
-              t: `Vui lòng sử dụng lệnh *apply-cv và đính kèm 1 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
+              t: `Vui lòng sử dụng lệnh *guicv và đính kèm 01 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
             });
           } else if (
-            message.content.t === '*apply-cv' &&
+            message.content.t === '*guicv' &&
             message.attachments.length === 0
           ) {
             this.logger.log('Command received without attachment');
             channel_test.send({
-              t: `Vui lòng sử dụng lệnh *apply-cv và đính kèm 1 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
+              t: `Vui lòng sử dụng lệnh *guicv và đính kèm 01 file CV (.docx hoặc .pdf) để gửi CV của bạn.`,
             });
           }
         } catch (error) {

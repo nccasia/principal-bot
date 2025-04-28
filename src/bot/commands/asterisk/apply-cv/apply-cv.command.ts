@@ -21,7 +21,7 @@ import { CommandMessage } from 'src/bot/abstractions/commands/asterisk.abstract'
 import { MezonClientService } from 'src/mezon/services/client.service';
 import { Logger } from '@nestjs/common';
 
-@Command('apply-cv')
+@Command('guicv')
 export class ApplyCVCommand extends CommandMessage {
   private readonly logger = new Logger(ApplyCVCommand.name);
 
