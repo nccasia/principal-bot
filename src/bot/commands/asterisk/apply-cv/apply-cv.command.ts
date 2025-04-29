@@ -33,14 +33,6 @@ export class ApplyCVCommand extends CommandMessage {
 
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
     const attachments = message.attachments;
-    if (attachments.length > 1) {
-      return this.generateReplyMessage(
-        {
-          content: `Chỉ gửi 1 file duy nhất.`,
-        },
-        message,
-      );
-    }
     const attachment = attachments[0];
 
     if (attachment.filetype !== 'pdf' && attachment.filetype !== 'docx') {

@@ -12,7 +12,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { generateReplyMessage } from 'src/bot/utils/reply-message-generator';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 
-// TODO: Implement the MezonClientService to handle client operations
 @Injectable()
 export class MezonClientService {
   private readonly logger = new Logger(MezonClientService.name);
@@ -35,7 +34,9 @@ export class MezonClientService {
         this.logger.log('Mezon client is ready!');
       });
 
+      //Channel chính
       const channel = await this.client.channels.fetch('1840681402413092864');
+      //Channel test
       const channel_test = await this.client.channels.fetch(
         '1840673714937532416',
       );
@@ -102,6 +103,7 @@ export class MezonClientService {
             const attachmentType = message.attachments[0].filetype;
             if (attachmentType !== 'docx' && attachmentType !== 'pdf') {
               getMessAndReply(channelRep, messageDemand);
+              return;
             }
 
             try {
