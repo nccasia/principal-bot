@@ -32,16 +32,20 @@ export class ApplyCVCommand extends CommandMessage {
   }
 
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
-    const attachments = message.attachments;
-    const attachment = attachments[0];
+    const attachmentType = message.attachments[0].filetype;
+    const isValidFormat =
+      attachmentType === 'pdf' ||
+      attachmentType === 'application/pdf' ||
+      attachmentType === 'docx' ||
+      attachmentType ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-    if (attachment.filetype !== 'pdf' && attachment.filetype !== 'docx') {
-      return this.generateReplyMessage(
-        {
-          content: `Chỉ chấp nhận định dạng PDF hoặc DOCX.`,
+    if (!isValidFormat) {
+      return {
+        msg: {
+          content: 'Chỉ chấp nhận định dạng PDF hoặc DOCX.',
         },
-        message,
-      );
+      };
     }
 
     const messageid = message.id;

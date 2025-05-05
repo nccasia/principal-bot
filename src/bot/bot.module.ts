@@ -6,6 +6,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { MezonModule } from 'src/mezon/mezon.module';
 import { Asterisk } from './commands/asterisk/asterisk';
 import { ApplyCVCommand } from './commands/asterisk/apply-cv/apply-cv.command';
+import { MessageButtonClickListener } from './listeners/message-button-click.listener';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { ApplyCVCommand } from './commands/asterisk/apply-cv/apply-cv.command';
     }),
     EventEmitterModule.forRoot(),
   ],
-  providers: [Asterisk, ApplyCVCommand],
+  providers: [Asterisk, ApplyCVCommand, MessageButtonClickListener],
   exports: [Asterisk],
 })
 export class BotModule {}
