@@ -3,9 +3,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { Events, MezonClient } from 'mezon-sdk';
+import { MezonClient } from 'mezon-sdk';
 import { MezonClientService } from 'src/mezon/services/client.service';
-
+import {
+  EmbedProps,
+  MEZON_EMBED_FOOTER,
+} from 'src/bot/commands/asterisk/config/config';
+import { COLORS } from 'src/bot/utils/helper';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
@@ -129,38 +133,62 @@ export class MessageButtonClickListener {
           : extraData[fieldKey]; // Sử dụng nguyên giá trị nếu không phải mảng
       }
 
-      // Tạo nội dung tin nhắn xác nhận
-      const sentCvContent =
-        '```' +
-        'Bạn đã nộp CV thành công !' +
-        '\n\n' +
-        `Họ tên: ${formValues['fullname']}` +
-        '\n' +
-        `Email: ${formValues['email']}` +
-        '\n' +
-        `Số điện thoại: ${formValues['phone']}` +
-        '\n' +
-        `Loại ứng viên: ${formValues['candidate-type']}` +
-        '\n' +
-        `Vị trí: ${formValues['position']}` +
-        '\n' +
-        `Chi nhánh: ${formValues['branch']}` +
-        '\n' +
-        `Nguồn CV: ${formValues['cv-source']}` +
-        '\n' +
-        (formValues['dob'] ? `Ngày sinh: ${formValues['dob']}\n` : '') +
-        (formValues['gender'] ? `Giới tính: ${formValues['gender']}\n` : '') +
-        (formValues['address'] ? `Địa chỉ: ${formValues['address']}\n` : '') +
-        (formValues['note'] ? `Ghi chú: ${formValues['note']}\n` : '') +
-        '\n' +
-        'Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.' +
-        '```';
+      // Embed
+      const confirmEmbed: EmbedProps[] = [
+        {
+          color: COLORS.Green,
+          title: '✅ Gửi CV thành công!',
+          description:
+            'Cảm ơn bạn đã gửi CV. Chúng tôi sẽ liên hệ với bạn sớm nhất có thể.',
+          fields: [
+            {
+              name: 'Thông tin cá nhân',
+              value: `Họ tên: ${formValues['fullname']}  -  Email: ${formValues['email']}  -  Số điện thoại: ${formValues['phone']}`,
+            },
+            {
+              name: 'Thông tin vị trí ứng tuyển',
+              value: `Vị trí: ${formValues['position']}  -  Chi nhánh: ${formValues['branch']}  -  Loại ứng viên: ${formValues['candidate-type']}`,
+            },
+            ...(formValues['gender'] ||
+            formValues['dob'] ||
+            formValues['address']
+              ? [
+                  {
+                    name: 'Thông tin bổ sung',
+                    value: `${formValues['gender'] ? `Giới tính: ${formValues['gender']}  ` : ''}${
+                      formValues['dob']
+                        ? `-  Ngày sinh: ${formValues['dob']}\n`
+                        : ''
+                    }${formValues['address'] ? `-  Địa chỉ: ${formValues['address']}` : ''}`,
+                  },
+                ]
+              : []),
+            ...(formValues['note']
+              ? [
+                  {
+                    name: 'Ghi chú',
+                    value: formValues['note'],
+                  },
+                ]
+              : []),
+            {
+              name: 'Nguồn CV',
+              value: formValues['cv-source'],
+            },
+          ],
+          thumbnail: {
+            url: 'https://cdn.mezon.ai/1840673714920755200/1840673714937532416/1831911016607256600/1745203716783_undefinedbeautiful_green_tree_field_ireland_600nw_2493424341.webp',
+          },
+          timestamp: new Date().toISOString(),
+          footer: MEZON_EMBED_FOOTER,
+        },
+      ];
 
       try {
         // Gửi tin nhắn xác nhận - đã sửa cách xử lý Promise
         const channel = await this.client.channels.fetch(data.channel_id);
         await channel.send({
-          t: sentCvContent,
+          embed: confirmEmbed,
         });
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);

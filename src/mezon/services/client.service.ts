@@ -6,10 +6,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { MezonClientConfig } from '../dtos/mezon-client-config';
-import { ChannelMessage, MezonClient, Events } from 'mezon-sdk';
+import { ChannelMessage, MezonClient } from 'mezon-sdk';
 import { Asterisk } from 'src/bot/commands/asterisk/asterisk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { generateReplyMessage } from 'src/bot/utils/reply-message-generator';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { Event } from 'mezon-sdk/dist/cjs/api/api';
 
@@ -98,15 +97,6 @@ export class MezonClientService {
 
         const messageDemand =
           'Vui lòng gửi lệnh *guicv và đính kèm DUY NHẤT 01 file CV (.docx hoặc .pdf) để gửi CV của bạn.';
-        const reply = (content: string) => {
-          generateReplyMessage(
-            {
-              t: content,
-            },
-            message,
-            true,
-          );
-        };
         const getMessAndReply = async (
           channelRep: Promise<TextChannel>,
           content: string,
