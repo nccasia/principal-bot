@@ -96,6 +96,22 @@ export class MessageButtonClickListener {
     }
   }
 
+  async serverEditMessage(data, embedProps: EmbedProps[]) {
+    try {
+      const channel = await this.client.channels.fetch(data.channel_id);
+      const message = await channel.messages.fetch(data.message_id);
+
+      await message.update({
+        embed: embedProps,
+        components: [], // Xóa các nút sau khi xử lý form
+      });
+
+      this.logger.log('Form đã được cập nhật thành công');
+    } catch (error) {
+      this.logger.error('Lỗi khi cập nhật tin nhắn:', error);
+    }
+  }
+
   async handleSubmitCV(data, messageId) {
     try {
       // Tạo ID duy nhất cho form submission này
@@ -169,7 +185,7 @@ export class MessageButtonClickListener {
           },
         ];
 
-        await this.serverSendMessage(data.channel_id, validationErrorEmbed);
+        await this.serverEditMessage(data, validationErrorEmbed);
         return;
       }
 
@@ -225,7 +241,7 @@ export class MessageButtonClickListener {
       ];
 
       try {
-        await this.serverSendMessage(data.channel_id, confirmEmbed);
+        await this.serverEditMessage(data, confirmEmbed);
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);
       } catch (sendError) {
@@ -267,7 +283,7 @@ export class MessageButtonClickListener {
 
       // Gửi thông báo hủy
       try {
-        await this.serverSendMessage(data.channel_id, cancelEmbed);
+        await this.serverEditMessage(data, cancelEmbed);
         this.logger.log('Đã gửi thông báo hủy form CV');
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi thông báo hủy CV:', sendError);

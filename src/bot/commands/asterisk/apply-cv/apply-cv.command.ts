@@ -149,6 +149,19 @@ export class ApplyCVCommand extends CommandMessage {
             },
           },
           {
+            name: 'Gender*',
+            value: '',
+            inputs: {
+              id: `applycv-${messageid}-gender`,
+              type: EMessageComponentType.SELECT,
+              component: {
+                options: genderOptions,
+                required: true,
+                valueSelected: genderOptions[0],
+              },
+            },
+          },
+          {
             name: 'Date of birth',
             value: '',
             inputs: {
@@ -159,19 +172,6 @@ export class ApplyCVCommand extends CommandMessage {
                 placeholder: 'DD/MM/YYYY',
                 required: true,
                 type: 'date',
-              },
-            },
-          },
-          {
-            name: 'Gender',
-            value: '',
-            inputs: {
-              id: `applycv-${messageid}-gender`,
-              type: EMessageComponentType.SELECT,
-              component: {
-                options: genderOptions,
-                required: true,
-                valueSelected: genderOptions[0],
               },
             },
           },
