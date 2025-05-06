@@ -16,6 +16,7 @@ import { Event } from 'mezon-sdk/dist/cjs/api/api';
 export class MezonClientService {
   private readonly logger = new Logger(MezonClientService.name);
   private client: MezonClient;
+  private readonly config: MezonClientConfig;
   // Thêm bộ nhớ đệm để theo dõi các sự kiện button đã xử lý
   private processedButtonEvents = new Map<string, number>();
 
@@ -25,6 +26,7 @@ export class MezonClientService {
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.client = new MezonClient(clientConfig.token);
+    this.config = clientConfig;
   }
 
   getClient() {
@@ -74,10 +76,12 @@ export class MezonClientService {
       });
 
       //Channel chính
-      const channel = await this.client.channels.fetch('1840681402413092864');
+      const channel = await this.client.channels.fetch(
+        this.config.channel_main_id,
+      );
       //Channel test
       const channel_test = await this.client.channels.fetch(
-        '1840673714937532416',
+        this.config.channel_test_id,
       );
 
       // Khi người dùng mới vào kênh

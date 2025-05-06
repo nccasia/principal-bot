@@ -10,16 +10,16 @@ import {
 
 export class CvFormDto {
   @IsNotEmpty({ message: 'Họ và tên không được để trống' })
-  @IsString({ message: 'Họ và tên không hợp lệ' })
+  @IsString({ message: 'Họ và tên không hợp lệ (vd: Nguyễn Văn A)' })
   fullname: string;
 
   @IsNotEmpty({ message: 'Email không được để trống' })
-  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @IsEmail({}, { message: 'Email không hợp lệ (vd: nguyenvana@gmail.com)' })
   email: string;
 
   @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
   @IsString({ message: 'Số điện thoại không hợp lệ' })
-  @Length(10, 10, { message: 'Số điện thoại không hợp lệ' })
+  @Length(10, 10, { message: 'Số điện thoại không hợp lệ (vd: 0123456789)' })
   phone: string;
 
   @IsNotEmpty({ message: 'Loại ứng viên không được để trống' })

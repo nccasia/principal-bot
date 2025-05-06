@@ -25,6 +25,8 @@ export class MezonModule {
           ) => {
             const clientConfig: MezonClientConfig = {
               token: configService.get<string>('MEZON_TOKEN'),
+              channel_main_id: configService.get<string>('CHANNEL_MAIN_ID'),
+              channel_test_id: configService.get<string>('CHANNEL_TEST_ID'),
             };
 
             const client = new MezonClientService(
