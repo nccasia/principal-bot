@@ -10,6 +10,9 @@ import {
   MEZON_EMBED_FOOTER,
 } from 'src/bot/commands/asterisk/config/config';
 import { COLORS } from 'src/bot/utils/helper';
+import { plainToClass } from 'class-transformer';
+import { CvFormDto } from '../dtos/cv-form.dto';
+import { validate } from 'class-validator';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
@@ -82,6 +85,17 @@ export class MessageButtonClickListener {
     }
   }
 
+  async serverSendMessage(channelId, messageEmbedProps: EmbedProps[]) {
+    try {
+      const channel = await this.client.channels.fetch(channelId);
+      await channel.send({
+        embed: messageEmbedProps,
+      });
+    } catch (error) {
+      this.logger.error('Lỗi trong serverSendMessage:', error);
+    }
+  }
+
   async handleSubmitCV(data, messageId) {
     try {
       // Tạo ID duy nhất cho form submission này
@@ -131,6 +145,32 @@ export class MessageButtonClickListener {
         formValues[key] = Array.isArray(extraData[fieldKey])
           ? extraData[fieldKey][0] // Lấy giá trị đầu tiên nếu là mảng
           : extraData[fieldKey]; // Sử dụng nguyên giá trị nếu không phải mảng
+      }
+      this.logger.log('Giá trị form đã parse:', formValues);
+
+      // Validate dữ liệu
+      const cvForm = plainToClass(CvFormDto, formValues);
+      this.logger.log('Dữ liệu form sau khi parse:', cvForm);
+      const errors = await validate(cvForm);
+      this.logger.log('Kết quả validate:', errors);
+
+      if (errors.length > 0) {
+        // Tạo thông báo lỗi từ các lỗi validation
+        const errorMessages = errors.map((err) =>
+          Object.values(err.constraints || {}).join(', '),
+        );
+
+        const validationErrorEmbed: EmbedProps[] = [
+          {
+            color: COLORS.Red,
+            title: '❌ Lỗi gửi CV',
+            description: 'Vui lòng kiểm tra lại thông tin nhập vào:',
+            fields: [{ name: 'Lỗi', value: errorMessages.join(' - ') }],
+          },
+        ];
+
+        await this.serverSendMessage(data.channel_id, validationErrorEmbed);
+        return;
       }
 
       // Embed
@@ -185,11 +225,7 @@ export class MessageButtonClickListener {
       ];
 
       try {
-        // Gửi tin nhắn xác nhận - đã sửa cách xử lý Promise
-        const channel = await this.client.channels.fetch(data.channel_id);
-        await channel.send({
-          embed: confirmEmbed,
-        });
+        await this.serverSendMessage(data.channel_id, confirmEmbed);
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);
       } catch (sendError) {
@@ -221,12 +257,17 @@ export class MessageButtonClickListener {
         Date.now(),
       );
 
+      const cancelEmbed: EmbedProps[] = [
+        {
+          color: COLORS.Red,
+          title: '❌ Hủy gửi CV',
+          description: 'Bạn đã hủy gửi CV.',
+        },
+      ];
+
       // Gửi thông báo hủy
       try {
-        const channel = await this.client.channels.fetch(data.channel_id);
-        await channel.send({
-          t: 'Bạn đã hủy gửi CV, vui lòng thử lại sau.',
-        });
+        await this.serverSendMessage(data.channel_id, cancelEmbed);
         this.logger.log('Đã gửi thông báo hủy form CV');
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi thông báo hủy CV:', sendError);

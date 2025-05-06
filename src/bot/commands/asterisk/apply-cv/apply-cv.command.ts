@@ -157,7 +157,7 @@ export class ApplyCVCommand extends CommandMessage {
               component: {
                 id: `applycv-${messageid}-dob-plhder`,
                 placeholder: 'DD/MM/YYYY',
-                required: false,
+                required: true,
                 type: 'date',
               },
             },
@@ -170,7 +170,7 @@ export class ApplyCVCommand extends CommandMessage {
               type: EMessageComponentType.SELECT,
               component: {
                 options: genderOptions,
-                required: false,
+                required: true,
                 valueSelected: genderOptions[0],
               },
             },

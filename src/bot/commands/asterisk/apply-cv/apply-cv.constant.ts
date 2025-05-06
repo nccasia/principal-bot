@@ -37,6 +37,6 @@ export const cvSourceOptions = [
 ];
 
 export const genderOptions = [
-  { lable: 'Male', value: 'male' },
-  { lable: 'Female', value: 'female' },
+  { lable: 'Nam', value: 'male' },
+  { lable: 'Nữ', value: 'female' },
 ];
