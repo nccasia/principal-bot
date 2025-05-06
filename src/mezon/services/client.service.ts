@@ -84,6 +84,13 @@ export class MezonClientService {
         this.config.channel_test_id,
       );
 
+      // //Channel chính
+      // // const channel = await this.client.channels.fetch('1840681402413092864');
+      // //Channel test
+      // const channel_test = await this.client.channels.fetch(
+      //   '1840673714937532416',
+      // );
+
       // Khi người dùng mới vào kênh
       this.client.onUserChannelAdded((event) => {
         const user = event.users[0];
@@ -94,6 +101,19 @@ export class MezonClientService {
       });
 
       this.client.onChannelMessage(async (message: ChannelMessage) => {
+        // Channel được phép nhận tin nhắn
+        const allowedChannel = [
+          // this.config.channel_main_id,
+          this.config.channel_test_id,
+        ];
+
+        if (!allowedChannel.includes(message.channel_id)) {
+          this.logger.log(
+            `Received message from ${message.username} in an unauthorized channel: ${message.channel_id}`,
+          );
+          return;
+        }
+
         this.logger.log(
           `Received message from ${message.username}: ${message.content?.t}`,
         );
@@ -214,8 +234,8 @@ export class MezonClientService {
         }
       });
 
-      if (channel) {
-        this.logger.log(`Channel found: ${channel.name}`);
+      if (channel_test) {
+        this.logger.log(`Channel found: ${channel_test.name}`);
       } else {
         this.logger.warn('Channel not found');
       }
