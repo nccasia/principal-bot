@@ -8,7 +8,7 @@ import {
   BuildFormEmbed,
 } from 'src/bot/utils/embed-props';
 import { Command } from 'src/bot/decorators/command-storage.decorator';
-
+import cache from 'src/bot/utils/shared-cache';
 @Command('guicv')
 export class ApplyCVCommand extends CommandMessage {
   private readonly logger = new Logger(ApplyCVCommand.name);
@@ -25,6 +25,7 @@ export class ApplyCVCommand extends CommandMessage {
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
     const attachmentType = message.attachments[0].filetype;
     const messageid = message.id;
+    const userId = message.sender_id;
 
     const isValidFormat = validAttachmentTypes.includes(attachmentType);
     if (!isValidFormat) {
@@ -34,6 +35,16 @@ export class ApplyCVCommand extends CommandMessage {
         },
       };
     }
+
+    // Cache URL CV
+    if (message.attachments[0]?.url) {
+      cache.set(
+        `cv-attachment-${messageid}-${userId}`,
+        message.attachments[0].url,
+        600,
+      ); // 10 min
+    }
+    this.logger.log('URL CV:', `cv-attachment-${messageid}-${userId}`);
 
     const embed = BuildFormEmbed(messageid);
     const componentsButton = BuildComponentsButton(messageid);

@@ -15,6 +15,7 @@ import {
   CancelFormEmbed,
   ValidationErrorEmbed,
 } from '../utils/embed-props';
+import cache from '../utils/shared-cache';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
@@ -177,6 +178,19 @@ export class MessageButtonClickListener {
 
       try {
         await this.serverEditMessage(data, confirmEmbed);
+        const attachementUrl = cache.get(
+          `cv-attachment-${messageId}-${data.user_id}`,
+        );
+        this.logger.log(
+          'URL Key:',
+          `cv-attachment-${messageId}-${data.user_id}`,
+        );
+
+        if (attachementUrl) {
+          this.logger.log('Đã tìm thấy URL CV:', attachementUrl);
+        } else {
+          this.logger.warn('Không tìm thấy URL CV');
+        }
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);
       } catch (sendError) {

@@ -19,7 +19,6 @@ export class MezonClientService {
   private readonly config: MezonClientConfig;
   // Thêm bộ nhớ đệm để theo dõi các sự kiện button đã xử lý
   private processedButtonEvents = new Map<string, number>();
-
   constructor(
     clientConfig: MezonClientConfig,
     private readonly asterisk: Asterisk,
