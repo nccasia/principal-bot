@@ -6,21 +6,54 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { MezonClient } from 'mezon-sdk';
 import { MezonClientService } from 'src/mezon/services/client.service';
-import {
-  EmbedProps,
-  MEZON_EMBED_FOOTER,
-} from 'src/bot/commands/asterisk/config/config';
-import { COLORS } from 'src/bot/utils/helper';
+import { EmbedProps } from 'src/bot/commands/asterisk/config/config.interface';
 import { plainToClass } from 'class-transformer';
 import { CvFormDto } from '../dtos/cv-form.dto';
 import { validate } from 'class-validator';
+import {
+  BuildConfirmFormEmbed,
+  CancelFormEmbed,
+  ValidationErrorEmbed,
+} from '../utils/embed-props';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
-  // Lưu trữ sự kiện đã xử lý
   protected readonly processedEvents = new Map<string, number>();
-  // Lưu trữ form submissions đã xử lý để ngăn gửi tin nhắn trùng lặp
   private static processedSubmissions = new Map<string, number>();
+
+  private readonly formSubmissionCleanUp = (now: number) => {
+    const isProcessedEventsSizeGreaterThan100 = this.processedEvents.size > 100;
+    if (isProcessedEventsSizeGreaterThan100) {
+      const fiveMinutesAgo = now - 300000;
+      for (const [key, timestamp] of this.processedEvents.entries()) {
+        if (timestamp < fiveMinutesAgo) {
+          this.processedEvents.delete(key);
+        }
+      }
+    }
+  };
+  private checkEventProcessed = (now: number, eventId: string) => {
+    const isEventHasProcessed = this.processedEvents.has(eventId);
+    if (isEventHasProcessed) {
+      const lastProcessed = this.processedEvents.get(eventId);
+      const isEventProcessedIn2Seconds = now - lastProcessed < 2000;
+      if (isEventProcessedIn2Seconds) {
+        this.logger.log(`Đã bỏ qua sự kiện trùng lặp: ${eventId}`);
+        return;
+      }
+    }
+  };
+  private checkAndRegisterFormAction(actionId: string): boolean {
+    if (MessageButtonClickListener.processedSubmissions.has(actionId)) {
+      this.logger.log(`Action already processed: ${actionId}`);
+      return true;
+    }
+    MessageButtonClickListener.processedSubmissions.set(actionId, Date.now());
+    setTimeout(() => {
+      MessageButtonClickListener.processedSubmissions.delete(actionId);
+    }, 300000); // 5 minutes
+    return false;
+  }
 
   constructor(
     clientService: MezonClientService,
@@ -33,36 +66,15 @@ export class MessageButtonClickListener {
   @OnEvent('message_button_clicked')
   async handleButtonForm(data) {
     try {
-      // Tạo ID duy nhất từ thông tin sự kiện
       const eventId = `${data.message_id}_${data.button_id}_${data.user_id}`;
       const now = Date.now();
 
-      // Kiểm tra xem sự kiện này đã được xử lý gần đây chưa
-      if (this.processedEvents.has(eventId)) {
-        const lastProcessed = this.processedEvents.get(eventId);
-        // Nếu sự kiện đã được xử lý trong vòng 2 giây trước đó
-        if (now - lastProcessed < 2000) {
-          this.logger.log(`Đã bỏ qua sự kiện trùng lặp: ${eventId}`);
-          return; // Bỏ qua xử lý
-        }
-      }
-
-      // Ghi nhận sự kiện này đã được xử lý
+      this.formSubmissionCleanUp(now);
+      this.checkEventProcessed(now, eventId);
       this.processedEvents.set(eventId, now);
-
-      // Dọn dẹp bộ nhớ đệm theo định kỳ
-      if (this.processedEvents.size > 100) {
-        const fiveMinutesAgo = now - 300000;
-        for (const [key, timestamp] of this.processedEvents.entries()) {
-          if (timestamp < fiveMinutesAgo) {
-            this.processedEvents.delete(key);
-          }
-        }
-      }
 
       this.logger.log('Xử lý sự kiện button click:', data.button_id);
 
-      // Xử lý button ID
       const splitButtonId = data.button_id.split('_');
       if (splitButtonId.length !== 3) {
         this.logger.warn('Định dạng button ID không hợp lệ:', data.button_id);
@@ -104,7 +116,7 @@ export class MessageButtonClickListener {
 
       await message.update({
         embed: embedProps,
-        components: [], // Xóa các nút sau khi xử lý form
+        components: [],
       });
 
       this.logger.log('Form đã được cập nhật thành công');
@@ -115,29 +127,8 @@ export class MessageButtonClickListener {
 
   async handleSubmitCV(data, messageId) {
     try {
-      // Tạo ID duy nhất cho form submission này
       const formSubmissionId = `form_${messageId}_${data.user_id}`;
-
-      // Kiểm tra nếu form này đã được xử lý trước đó
-      if (
-        MessageButtonClickListener.processedSubmissions.has(formSubmissionId)
-      ) {
-        this.logger.log(`Form đã được xử lý trước đó: ${formSubmissionId}`);
-        return;
-      }
-
-      // Đánh dấu form này đã được xử lý TRƯỚC khi thực hiện các thao tác async
-      MessageButtonClickListener.processedSubmissions.set(
-        formSubmissionId,
-        Date.now(),
-      );
-
-      // Tự động dọn dẹp các form đã xử lý sau 5 phút
-      setTimeout(() => {
-        MessageButtonClickListener.processedSubmissions.delete(
-          formSubmissionId,
-        );
-      }, 300000);
+      if (this.checkAndRegisterFormAction(formSubmissionId)) return;
 
       // Parse data từ form
       const extraData = JSON.parse(data.extra_data);
@@ -172,74 +163,17 @@ export class MessageButtonClickListener {
       this.logger.log('Kết quả validate:', errors);
 
       if (errors.length > 0) {
-        // Tạo thông báo lỗi từ các lỗi validation
         const errorMessages = errors.map((err) =>
           Object.values(err.constraints || {}).join(', '),
         );
 
-        const validationErrorEmbed: EmbedProps[] = [
-          {
-            color: COLORS.Red,
-            title: '❌ Lỗi gửi CV',
-            description: 'Vui lòng kiểm tra lại thông tin nhập vào:',
-            fields: [{ name: 'Lỗi', value: errorMessages.join(' - ') }],
-          },
-        ];
+        const validationErrorEmbed = ValidationErrorEmbed(errorMessages);
 
         await this.serverEditMessage(data, validationErrorEmbed);
         return;
       }
 
-      // Embed
-      const confirmEmbed: EmbedProps[] = [
-        {
-          color: COLORS.Green,
-          title: '✅ Gửi CV thành công!',
-          description:
-            'Cảm ơn bạn đã gửi CV. Chúng tôi sẽ liên hệ với bạn sớm nhất có thể.',
-          fields: [
-            {
-              name: 'Thông tin cá nhân',
-              value: `Họ tên: ${formValues['fullname']}  -  Email: ${formValues['email']}  -  Số điện thoại: ${formValues['phone']}`,
-            },
-            {
-              name: 'Thông tin vị trí ứng tuyển',
-              value: `Vị trí: ${formValues['position']}  -  Chi nhánh: ${formValues['branch']}  -  Loại ứng viên: ${formValues['candidate-type']}`,
-            },
-            ...(formValues['gender'] ||
-            formValues['dob'] ||
-            formValues['address']
-              ? [
-                  {
-                    name: 'Thông tin bổ sung',
-                    value: `${formValues['gender'] ? `Giới tính: ${formValues['gender']}  ` : ''}${
-                      formValues['dob']
-                        ? `-  Ngày sinh: ${formValues['dob']}\n`
-                        : ''
-                    }${formValues['address'] ? `-  Địa chỉ: ${formValues['address']}` : ''}`,
-                  },
-                ]
-              : []),
-            ...(formValues['note']
-              ? [
-                  {
-                    name: 'Ghi chú',
-                    value: formValues['note'],
-                  },
-                ]
-              : []),
-            {
-              name: 'Nguồn CV',
-              value: formValues['cv-source'],
-            },
-          ],
-          thumbnail: {
-            url: 'https://cdn.mezon.ai/1840673714920755200/1840673714937532416/1831911016607256600/1745203716783_undefinedbeautiful_green_tree_field_ireland_600nw_2493424341.webp',
-          },
-          timestamp: new Date().toISOString(),
-          footer: MEZON_EMBED_FOOTER,
-        },
-      ];
+      const confirmEmbed = BuildConfirmFormEmbed(formValues);
 
       try {
         await this.serverEditMessage(data, confirmEmbed);
@@ -247,7 +181,6 @@ export class MessageButtonClickListener {
         this.logger.log('Thông tin form:', formValues);
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);
-        // Xóa khỏi danh sách đã xử lý nếu gặp lỗi để có thể thử lại sau
         MessageButtonClickListener.processedSubmissions.delete(
           formSubmissionId,
         );
@@ -259,30 +192,10 @@ export class MessageButtonClickListener {
 
   async handleCancelCV(data, messageId) {
     try {
-      // Tạo ID duy nhất cho cancel action này
       const cancelActionId = `cancel_${messageId}_${data.user_id}`;
+      if (this.checkAndRegisterFormAction(cancelActionId)) return;
 
-      // Kiểm tra nếu action này đã được xử lý
-      if (MessageButtonClickListener.processedSubmissions.has(cancelActionId)) {
-        this.logger.log(`Cancel action đã được xử lý: ${cancelActionId}`);
-        return;
-      }
-
-      // Đánh dấu đã xử lý
-      MessageButtonClickListener.processedSubmissions.set(
-        cancelActionId,
-        Date.now(),
-      );
-
-      const cancelEmbed: EmbedProps[] = [
-        {
-          color: COLORS.Red,
-          title: '❌ Hủy gửi CV',
-          description: 'Bạn đã hủy gửi CV.',
-        },
-      ];
-
-      // Gửi thông báo hủy
+      const cancelEmbed = CancelFormEmbed;
       try {
         await this.serverEditMessage(data, cancelEmbed);
         this.logger.log('Đã gửi thông báo hủy form CV');
