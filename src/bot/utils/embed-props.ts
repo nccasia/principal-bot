@@ -16,7 +16,10 @@ import { EmbedProps } from '../commands/asterisk/config/config.interface';
 
 import { COLORS } from './helper';
 
-export const BuildConfirmFormEmbed = (formValues: any): EmbedProps[] => [
+export const BuildConfirmFormEmbed = (
+  formValues: any,
+  avatarUrl: string,
+): EmbedProps[] => [
   {
     color: COLORS.Green,
     title: '✅ Gửi CV thành công!',
@@ -55,7 +58,9 @@ export const BuildConfirmFormEmbed = (formValues: any): EmbedProps[] => [
       },
     ],
     thumbnail: {
-      url: 'https://cdn.mezon.ai/1840673714920755200/1840673714937532416/1831911016607256600/1745203716783_undefinedbeautiful_green_tree_field_ireland_600nw_2493424341.webp',
+      url:
+        avatarUrl ||
+        'https://cdn.mezon.ai/1840673714920755200/1840673714937532416/1831911016607256600/1745203716783_undefinedbeautiful_green_tree_field_ireland_600nw_2493424341.webp',
     },
     timestamp: new Date().toISOString(),
     footer: MEZON_EMBED_FOOTER,

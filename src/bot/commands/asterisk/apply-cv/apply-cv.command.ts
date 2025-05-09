@@ -36,7 +36,7 @@ export class ApplyCVCommand extends CommandMessage {
       };
     }
 
-    // Cache URL CV
+    // Cache URL + avatar CV
     if (message.attachments[0]?.url) {
       cache.set(
         `cv-attachment-${messageid}-${userId}`,
@@ -44,8 +44,11 @@ export class ApplyCVCommand extends CommandMessage {
         600,
       ); // 10 min
     }
+    if (message.avatar) {
+      cache.set(`avatar-${messageid}-${userId}`, message.avatar, 600); // 10 min
+    }
     this.logger.log('URL CV:', `cv-attachment-${messageid}-${userId}`);
-
+    this.logger.log('Avatar:', `avatar-${messageid}-${userId}`);
     const embed = BuildFormEmbed(messageid);
     const componentsButton = BuildComponentsButton(messageid);
 

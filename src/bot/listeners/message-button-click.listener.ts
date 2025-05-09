@@ -174,18 +174,20 @@ export class MessageButtonClickListener {
         return;
       }
 
-      const confirmEmbed = BuildConfirmFormEmbed(formValues);
-
       try {
-        await this.serverEditMessage(data, confirmEmbed);
-        const attachementUrl = cache.get(
-          `cv-attachment-${messageId}-${data.user_id}`,
+        const avatarUrl: string = cache.get(
+          `avatar-${messageId}-${data.user_id}`,
         );
         this.logger.log(
           'URL Key:',
           `cv-attachment-${messageId}-${data.user_id}`,
         );
-
+        const confirmEmbed = BuildConfirmFormEmbed(formValues, avatarUrl);
+        await this.serverEditMessage(data, confirmEmbed);
+        const attachementUrl = cache.get(
+          `cv-attachment-${messageId}-${data.user_id}`,
+        );
+        this.logger.log('Avatar:', `avatar-${messageId}-${data.user_id}`);
         if (attachementUrl) {
           this.logger.log('Đã tìm thấy URL CV:', attachementUrl);
         } else {

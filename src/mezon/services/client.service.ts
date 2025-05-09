@@ -11,6 +11,7 @@ import { Asterisk } from 'src/bot/commands/asterisk/asterisk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { Event } from 'mezon-sdk/dist/cjs/api/api';
+import { validAttachmentTypes } from 'src/bot/commands/asterisk/apply-cv/apply-cv.constant';
 
 @Injectable()
 export class MezonClientService {
@@ -122,16 +123,14 @@ export class MezonClientService {
           'Vui lòng gửi lệnh *guicv và đính kèm DUY NHẤT 01 file CV (.docx hoặc .pdf) để gửi CV của bạn.';
         const getMessAndReply = async (
           channelRep: Promise<TextChannel>,
-          content: string,
+          content: object,
         ) => {
           try {
             const channel = await channelRep;
             const messageObj = await channel.messages.fetch(
               message.message_id!,
             );
-            await messageObj.reply({
-              t: content,
-            });
+            await messageObj.reply(content);
           } catch (error) {
             this.logger.error('Error in getMessAndReply:', error);
           }
@@ -147,7 +146,9 @@ export class MezonClientService {
             message.content?.t?.startsWith('*')
           ) {
             this.logger.log('Receiving multiple attachments - rejecting');
-            getMessAndReply(channelRep, messageDemand);
+            getMessAndReply(channelRep, {
+              t: messageDemand,
+            });
           }
 
           // Trường hợp 2: Người dùng nhập *guicv VÀ đính kèm file
@@ -160,28 +161,20 @@ export class MezonClientService {
             // Kiểm tra tồn tại của file và metadata
             if (!message.attachments[0] || !message.attachments[0].filetype) {
               this.logger.warn('Missing attachment metadata');
-              await getMessAndReply(
-                channelRep,
-                'Không thể xác định loại file. Vui lòng thử lại.',
-              );
+              await getMessAndReply(channelRep, {
+                t: 'Không thể xác định loại file. Vui lòng thử lại.',
+              });
               return;
             }
 
             const attachmentType = message.attachments[0].filetype;
             this.logger.log(`Attachment type: ${attachmentType}`);
-
-            const isDocx =
-              attachmentType === 'docx' ||
-              attachmentType ===
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-            const isPdf =
-              attachmentType === 'pdf' || attachmentType === 'application/pdf';
-
-            // Kiểm tra nếu là một trong hai định dạng hợp lệ
-            if (!isDocx && !isPdf) {
+            const isValidFormat = validAttachmentTypes.includes(attachmentType);
+            if (!isValidFormat) {
               this.logger.warn(`Invalid file type: ${attachmentType}`);
-              getMessAndReply(channelRep, messageDemand);
+              getMessAndReply(channelRep, {
+                t: messageDemand,
+              });
               return;
             }
 
@@ -192,15 +185,13 @@ export class MezonClientService {
               //Gửi form CV
               if (result && result.msg) {
                 try {
-                  const channel = await channelRep;
-                  await channel.send(result.msg);
+                  getMessAndReply(channelRep, result.msg);
                   this.logger.log('Reply message sent successfully');
                 } catch (sendError) {
                   this.logger.error('Error sending reply:', sendError);
-                  getMessAndReply(
-                    channelRep,
-                    'Có lỗi xảy ra khi gửi tin nhắn.',
-                  );
+                  getMessAndReply(channelRep, {
+                    t: 'Có lỗi xảy ra khi gửi tin nhắn.',
+                  });
                 }
               }
             } catch (error) {
@@ -217,7 +208,9 @@ export class MezonClientService {
             !message.content?.t?.startsWith('*')
           ) {
             this.logger.log('File attached without command - suggesting guicv');
-            getMessAndReply(channelRep, messageDemand);
+            getMessAndReply(channelRep, {
+              t: messageDemand,
+            });
           }
           // Trường hợp 4: Người dùng gõ lệnh nhưng không đính kèm file
           else if (
@@ -225,11 +218,15 @@ export class MezonClientService {
             message.attachments?.length === 0
           ) {
             this.logger.log('Command received without attachment');
-            getMessAndReply(channelRep, messageDemand);
+            getMessAndReply(channelRep, {
+              t: messageDemand,
+            });
           }
         } catch (error) {
           this.logger.error('Error processing message:', error);
-          getMessAndReply(channelRep, 'Đã xảy ra lỗi khi xử lý tin nhắn.');
+          getMessAndReply(channelRep, {
+            t: 'Đã xảy ra lỗi khi xử lý tin nhắn.',
+          });
         }
       });
 
