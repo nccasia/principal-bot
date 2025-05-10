@@ -3,15 +3,13 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  BeforeInsert,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 
 @Entity('cv_forms')
 export class CvFormEntity {
-  @PrimaryColumn({ type: 'uuid' })
-  id: string;
+  @PrimaryGeneratedColumn('increment')
+  id: number;
 
   @Column()
   fullname: string;
@@ -55,10 +53,10 @@ export class CvFormEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt: Date;
 
-  @BeforeInsert()
-  generateId() {
-    if (!this.id) {
-      this.id = uuidv4();
-    }
-  }
+  // @BeforeInsert()
+  // generateId() {
+  //   if (!this.id) {
+  //     this.id = uuidv4();
+  //   }
+  // }
 }
