@@ -36,29 +36,6 @@ export enum DynamicCommandType {
   VIDEO = 'video',
 }
 
-export interface EmbedProps {
-  color?: string;
-  title?: string;
-  url?: string;
-  author?: {
-    name: string;
-    icon_url?: string;
-    url?: string;
-  };
-  description?: string;
-  thumbnail?: { url: string };
-  fields?: Array<{
-    name: string;
-    value: string;
-    inline?: boolean;
-    options?: any[];
-    inputs?: {};
-  }>;
-  image?: { url: string };
-  timestamp?: string;
-  footer?: { text: string; icon_url?: string };
-}
-
 export enum EMessageSelectType {
   TEXT = 1,
   USER = 2,
