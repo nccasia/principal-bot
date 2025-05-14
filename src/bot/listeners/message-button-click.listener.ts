@@ -16,6 +16,12 @@ import {
   ValidationErrorEmbed,
 } from '../utils/embed-props';
 import cache from '../utils/shared-cache';
+import { CvFormRepository } from '../repositories/cv-form.repository';
+import { TalentApiService } from '../services/talent-api.service';
+import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
+import { getCVSourceIdFromCVSourceValue } from '../utils/helper';
+import { getBranchIdFromBranchName } from '../utils/helper';
+import { getSubPositionIdFromSubPositionName } from '../utils/helper';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
@@ -59,6 +65,8 @@ export class MessageButtonClickListener {
   constructor(
     clientService: MezonClientService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cvRepository: CvFormRepository,
+    private readonly talentApiService: TalentApiService,
   ) {
     this.client = clientService.getClient();
   }
@@ -128,6 +136,14 @@ export class MessageButtonClickListener {
 
   async handleSubmitCV(data, messageId) {
     try {
+      const validUserToClickButton = cache.get(
+        `valid-user-to-click-button-${messageId}-${data.user_id}`,
+      );
+      if (!validUserToClickButton) {
+        this.logger.warn('User không hợp lệ đã click button Submit CV');
+        return;
+      }
+
       const formSubmissionId = `form_${messageId}_${data.user_id}`;
       if (this.checkAndRegisterFormAction(formSubmissionId)) return;
 
@@ -182,19 +198,59 @@ export class MessageButtonClickListener {
           'URL Key:',
           `cv-attachment-${messageId}-${data.user_id}`,
         );
+
         const confirmEmbed = BuildConfirmFormEmbed(formValues, avatarUrl);
         await this.serverEditMessage(data, confirmEmbed);
-        const attachementUrl = cache.get(
+
+        const attachmentUrlFromCache = cache.get(
           `cv-attachment-${messageId}-${data.user_id}`,
         );
         this.logger.log('Avatar:', `avatar-${messageId}-${data.user_id}`);
-        if (attachementUrl) {
-          this.logger.log('Đã tìm thấy URL CV:', attachementUrl);
+        if (attachmentUrlFromCache) {
+          this.logger.log('Đã tìm thấy URL CV:', attachmentUrlFromCache);
         } else {
           this.logger.warn('Không tìm thấy URL CV');
         }
+        // Đây là DB của Princibal Bot
+        // const cvDataToCreate = {
+        //   fullname: cvForm.fullname,
+        //   email: cvForm.email,
+        //   phone: cvForm.phone,
+        //   'candidate-type': cvForm['candidate-type'],
+        //   position: cvForm.position,
+        //   branch: cvForm.branch,
+        //   'cv-source': cvForm['cv-source'],
+        //   gender: cvForm.gender,
+        //   dob: cvForm.dob || null,
+        //   address: cvForm.address || null,
+        //   note: cvForm.note || null,
+        //   attachmentUrl: attachmentUrlFromCache as string,
+        // };
+
+        // await this.cvRepository.createCvForm(cvDataToCreate);
+
+        const externalCvPayload = new ExternalCvPayloadDto();
+        externalCvPayload.Name = cvForm.fullname;
+        externalCvPayload.Email = cvForm.email;
+        externalCvPayload.Phone = cvForm.phone;
+        externalCvPayload.SubPositionId = getSubPositionIdFromSubPositionName(
+          cvForm['position'],
+        );
+        externalCvPayload.BranchId = getBranchIdFromBranchName(cvForm.branch);
+        externalCvPayload.CVSourceId = getCVSourceIdFromCVSourceValue(
+          cvForm['cv-source'],
+        );
+        externalCvPayload.Birthday = cvForm.dob || null;
+        externalCvPayload.IsFemale = cvForm.gender === 'female' ? true : false;
+        externalCvPayload.Address = cvForm.address || null;
+        externalCvPayload.Note = cvForm.note || null;
+        externalCvPayload.LinkCV = attachmentUrlFromCache as string;
+
+        await this.talentApiService.submitCandidateCV(externalCvPayload);
+        this.logger.log('Payload:', externalCvPayload);
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);
+        cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);
         MessageButtonClickListener.processedSubmissions.delete(
@@ -208,6 +264,13 @@ export class MessageButtonClickListener {
 
   async handleCancelCV(data, messageId) {
     try {
+      const validUserToClickButton = cache.get(
+        `valid-user-to-click-button-${messageId}-${data.user_id}`,
+      );
+      if (!validUserToClickButton) {
+        this.logger.warn('User không hợp lệ đã click button hủy');
+        return;
+      }
       const cancelActionId = `cancel_${messageId}_${data.user_id}`;
       if (this.checkAndRegisterFormAction(cancelActionId)) return;
 
@@ -215,6 +278,7 @@ export class MessageButtonClickListener {
       try {
         await this.serverEditMessage(data, cancelEmbed);
         this.logger.log('Đã gửi thông báo hủy form CV');
+        cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi thông báo hủy CV:', sendError);
         MessageButtonClickListener.processedSubmissions.delete(cancelActionId);

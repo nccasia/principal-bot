@@ -47,6 +47,9 @@ export class ApplyCVCommand extends CommandMessage {
     if (message.avatar) {
       cache.set(`avatar-${messageid}-${userId}`, message.avatar, 600); // 10 min
     }
+    // Cache user đã click button
+    cache.set(`valid-user-to-click-button-${messageid}-${userId}`, true, 600); // 10 min
+
     this.logger.log('URL CV:', `cv-attachment-${messageid}-${userId}`);
     this.logger.log('Avatar:', `avatar-${messageid}-${userId}`);
     const embed = BuildFormEmbed(messageid);
