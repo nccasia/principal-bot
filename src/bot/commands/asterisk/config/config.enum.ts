@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 export const BOT_ID = process.env.BOT_KOMU_ID;
-
 export const EMAIL_DOMAIN = 'ncc.asia';
 
 export const MEZON_IMAGE_URL =
@@ -34,29 +32,6 @@ export enum DynamicCommandType {
   TEXT = 'text',
   IMAGE = 'image',
   VIDEO = 'video',
-}
-
-export interface EmbedProps {
-  color?: string;
-  title?: string;
-  url?: string;
-  author?: {
-    name: string;
-    icon_url?: string;
-    url?: string;
-  };
-  description?: string;
-  thumbnail?: { url: string };
-  fields?: Array<{
-    name: string;
-    value: string;
-    inline?: boolean;
-    options?: any[];
-    inputs?: {};
-  }>;
-  image?: { url: string };
-  timestamp?: string;
-  footer?: { text: string; icon_url?: string };
 }
 
 export enum EMessageSelectType {

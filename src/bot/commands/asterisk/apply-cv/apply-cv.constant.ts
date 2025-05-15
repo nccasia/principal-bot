@@ -37,6 +37,14 @@ export const cvSourceOptions = [
 ];
 
 export const genderOptions = [
-  { lable: 'Male', value: 'male' },
-  { lable: 'Female', value: 'female' },
+  { label: 'Nam', value: 'male' },
+  { label: 'Nữ', value: 'female' },
+  { label: 'Khác', value: 'other' },
+];
+
+export const validAttachmentTypes = [
+  'pdf',
+  'application/pdf',
+  'docx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
