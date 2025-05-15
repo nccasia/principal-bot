@@ -27,6 +27,8 @@ export class MezonModule {
               token: configService.get<string>('MEZON_TOKEN'),
               channel_main_id: configService.get<string>('CHANNEL_MAIN_ID'),
               channel_test_id: configService.get<string>('CHANNEL_TEST_ID'),
+              signature: configService.get<string>('SIGNATURE'),
+              talent_api_url: configService.get<string>('TALENT_API_URL'),
             };
 
             const client = new MezonClientService(

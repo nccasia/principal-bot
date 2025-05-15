@@ -17,6 +17,7 @@ import { BranchPositionEntity } from './entities/branch-position.entity';
 import { CvFormController } from './controllers/cv-form.controller';
 import { CvFormService } from './services/cv-form.service';
 import { TalentApiService } from './services/talent-api.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { TalentApiService } from './services/talent-api.service';
       imports: [ConfigModule],
     }),
     EventEmitterModule.forRoot(),
+    HttpModule,
   ],
   controllers: [CvFormController],
   providers: [

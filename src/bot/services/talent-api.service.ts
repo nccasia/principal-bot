@@ -1,36 +1,149 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
-import { getFormData } from '../../bot-api-client/fetch';
-import { submitCandidateCV } from '../../bot-api-client/submit';
 import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import crypto from 'crypto';
+import FormData from 'form-data';
 
 @Injectable()
 export class TalentApiService {
   private readonly logger = new Logger(TalentApiService.name);
+  private readonly signature: string;
+  private readonly talentApiUrl: string;
 
-  constructor() {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {
+    this.signature = this.configService.get<string>('SIGNATURE');
+    this.talentApiUrl = this.configService.get<string>('TALENT_API_URL');
+  }
 
-  async getFormData(): Promise<any> {
+  private computeHash(input: string) {
+    const hash = crypto.createHash('sha256');
+    hash.update(input, 'utf8');
+    return hash.digest('base64');
+  }
+
+  private computeHashForFormData(
+    candidateData: ExternalCvPayloadDto,
+    signature: string,
+  ) {
+    const formValues = [];
+    const sortedKeys = Object.keys(candidateData).sort();
+
+    for (const key of sortedKeys) {
+      const value = candidateData[key];
+
+      if (value === undefined) {
+        continue; // Skip undefined properties for hashing
+      }
+
+      let processedValue;
+      if (value === null) {
+        processedValue = '';
+      } else if (typeof value === 'boolean' || typeof value === 'number') {
+        processedValue = String(value);
+      } else {
+        processedValue = value; // Assumed string
+      }
+      formValues.push(`${key}=${processedValue}`);
+    }
+
+    const formString = formValues.join('&');
+
+    const input = formString + signature;
+
+    return this.computeHash(input);
+  }
+
+  private computeHashForGet(params = {}, signature: string) {
+    const parts = [];
+
+    const sortedKeys = Object.keys(params).sort();
+
+    for (const key of sortedKeys) {
+      const value = params[key];
+      if (Array.isArray(value)) {
+        value.sort().forEach((v) => parts.push(`${key}=${v}`));
+      } else {
+        parts.push(`${key}=${value}`);
+      }
+    }
+
+    const queryString = parts.join('&');
+
+    const input = queryString ? queryString + signature : signature;
+
+    console.log('String being hashed:', input);
+    return this.computeHash(input);
+  }
+
+  submitCandidateCV(candidateData: ExternalCvPayloadDto) {
     try {
-      return await getFormData();
-      this.logger.log('Successfully get form data from Talent API');
-    } catch (error: any) {
-      this.logger.error(
-        'Failed to get form data from Talent API',
-        error instanceof Error ? error.stack : String(error),
-      );
+      const formData = new FormData();
+
+      Object.entries(candidateData).forEach(([key, value]) => {
+        if (value === undefined) {
+          return; // Skip undefined properties for FormData
+        }
+
+        let valueToAppend;
+        if (value === null) {
+          valueToAppend = '';
+        } else if (typeof value === 'boolean' || typeof value === 'number') {
+          valueToAppend = String(value);
+        } else {
+          // Assuming value is already a string if not number, boolean, null, or undefined.
+          // If LinkCV or other fields could be something else (e.g. a File object for actual uploads),
+          // this part might need adjustment, but for now, DTO implies strings.
+          valueToAppend = value;
+        }
+        formData.append(key, valueToAppend);
+      });
+
+      const hash = this.computeHashForFormData(candidateData, this.signature);
+
+      console.log('Generated hash:', hash);
+
+      const headers = {
+        ...formData.getHeaders(),
+        'X-Hash': hash,
+      };
+
+      const response = this.httpService.post(this.talentApiUrl, formData, {
+        headers,
+      });
+
+      console.log('Success! CV submitted with ID:', response);
+      return response;
+    } catch (error) {
+      console.error('Error submitting CV:', error);
       throw error;
     }
   }
 
-  async submitCandidateCV(candidateData: ExternalCvPayloadDto): Promise<any> {
+  getFormData(params = {}) {
     try {
-      return await submitCandidateCV(candidateData);
-      this.logger.log('Successfully submit CV to Talent API');
-    } catch (error: any) {
-      this.logger.error(
-        'Failed to submit CV to Talent API',
-        error instanceof Error ? error.stack : String(error),
-      );
+      const hash = this.computeHashForGet(params, this.signature);
+      console.log('Generated hash:', hash);
+
+      const headers = {
+        'X-Hash': hash,
+      };
+
+      console.log('Sending request to:', this.talentApiUrl);
+
+      const response = this.httpService.get(this.talentApiUrl, {
+        params: params,
+        headers: headers,
+      });
+
+      console.log('Request successful!');
+      return response;
+    } catch (error) {
+      console.error('Error fetching form data:', error);
       throw error;
     }
   }
