@@ -266,3 +266,11 @@ export const ValidationErrorEmbed = (errorMessages: string[]): EmbedProps[] => {
     },
   ];
 };
+
+export const LimitSubmitCVEmbed: EmbedProps[] = [
+  {
+    color: COLORS.Red,
+    title: '❌ Lỗi gửi CV',
+    description: 'Bạn đã gửi CV quá nhiều lần. Vui lòng thử lại sau 24 giờ.',
+  },
+];

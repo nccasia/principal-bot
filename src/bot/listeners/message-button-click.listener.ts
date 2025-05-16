@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-base-to-string */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -13,6 +13,7 @@ import { validate } from 'class-validator';
 import {
   BuildConfirmFormEmbed,
   CancelFormEmbed,
+  LimitSubmitCVEmbed,
   ValidationErrorEmbed,
 } from '../utils/embed-props';
 import cache from '../utils/shared-cache';
@@ -27,6 +28,7 @@ export class MessageButtonClickListener {
   protected client: MezonClient;
   protected readonly processedEvents = new Map<string, number>();
   private static processedSubmissions = new Map<string, number>();
+  private static CV_SUBMIT_LIMIT = 10;
 
   private readonly formSubmissionCleanUp = (now: number) => {
     const isProcessedEventsSizeGreaterThan100 = this.processedEvents.size > 100;
@@ -194,10 +196,24 @@ export class MessageButtonClickListener {
         const avatarUrl: string = cache.get(
           `avatar-${messageId}-${data.user_id}`,
         );
-        this.logger.log(
-          'URL Key:',
-          `cv-attachment-${messageId}-${data.user_id}`,
-        );
+
+        // Limit user submit CV
+        const cacheKeySubmitCV = `attempt-submit-cv-${data.user_id}`;
+        let currentAttemptCount = cache.get(cacheKeySubmitCV) as
+          | number
+          | undefined;
+
+        if (currentAttemptCount === undefined) {
+          currentAttemptCount = 0;
+        }
+
+        if (currentAttemptCount >= MessageButtonClickListener.CV_SUBMIT_LIMIT) {
+          this.logger.log(
+            `User ${data.user_id} has reached submission limit. Attempts: ${currentAttemptCount}`,
+          );
+          await this.serverEditMessage(data, LimitSubmitCVEmbed);
+          return;
+        }
 
         const confirmEmbed = BuildConfirmFormEmbed(formValues, avatarUrl);
         await this.serverEditMessage(data, confirmEmbed);
@@ -246,11 +262,17 @@ export class MessageButtonClickListener {
         externalCvPayload.Note = cvForm.note || null;
         externalCvPayload.LinkCV = attachmentUrlFromCache as string;
 
-        await this.talentApiService.submitCandidateCV(externalCvPayload);
+        this.talentApiService.submitCandidateCV(externalCvPayload);
         this.logger.log('Payload:', externalCvPayload);
         this.logger.log('Đã gửi xác nhận nộp CV thành công');
         this.logger.log('Thông tin form:', formValues);
         cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
+
+        const newAttemptCount = currentAttemptCount + 1;
+        cache.set(cacheKeySubmitCV, newAttemptCount);
+        this.logger.log(
+          `User ${data.user_id} CV submitted. Attempt count updated to: ${newAttemptCount}`,
+        );
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);
         MessageButtonClickListener.processedSubmissions.delete(

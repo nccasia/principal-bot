@@ -50,6 +50,12 @@ export class ApplyCVCommand extends CommandMessage {
     // Cache user đã click button
     cache.set(`valid-user-to-click-button-${messageid}-${userId}`, true, 600); // 10 min
 
+    // Limit user submit CV
+    const isUserAttemptSubmit = cache.has(`attempt-submit-cv-${userId}`);
+    if (!isUserAttemptSubmit) {
+      cache.set(`attempt-submit-cv-${userId}`, 0, 24 * 60 * 60); // 1 day
+    }
+
     this.logger.log('URL CV:', `cv-attachment-${messageid}-${userId}`);
     this.logger.log('Avatar:', `avatar-${messageid}-${userId}`);
     const embed = BuildFormEmbed(messageid);
