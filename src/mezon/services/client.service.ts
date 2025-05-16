@@ -25,11 +25,17 @@ export class MezonClientService {
     private readonly asterisk: Asterisk,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.client = new MezonClient(clientConfig.token);
     this.config = clientConfig;
+    if (!clientConfig.token) {
+      this.logger.error('Mezon token is missing in configuration!');
+      throw new Error(
+        'Mezon token is undefined. Cannot initialize MezonClientService.',
+      );
+    }
+    this.client = new MezonClient(clientConfig.token);
   }
 
-  getClient() {
+  getClient(): MezonClient {
     return this.client;
   }
 
@@ -70,19 +76,17 @@ export class MezonClientService {
         this.logger.log('Button clicked:', data);
         this.eventEmitter.emit('message_button_clicked', data);
       });
-
-      this.client.once('ready', () => {
+      let channel_test: TextChannel;
+      this.client.once('ready', async () => {
         this.logger.log('Mezon client is ready!');
+        //Channel test
+        channel_test = await this.client.channels.fetch(
+          this.config.channel_test_id,
+        );
       });
-
-      //Channel chính
-      const channel = await this.client.channels.fetch(
-        this.config.channel_main_id,
-      );
-      //Channel test
-      const channel_test = await this.client.channels.fetch(
-        this.config.channel_test_id,
-      );
+      // const channel = await this.client.channels.fetch(
+      //   this.config.channel_main_id,
+      // );
 
       // //Channel chính
       // // const channel = await this.client.channels.fetch('1840681402413092864');
@@ -99,6 +103,8 @@ export class MezonClientService {
           t: `Xin chào ${user.username}! Chào mừng bạn đến với kênh ${channelName}. Hãy sử dụng lệnh *guicv và đính kèm 01 file (.docx hoặc .pdf) để gửi CV của bạn.`,
         });
       });
+
+      //Channel chính
 
       this.client.onChannelMessage(async (message: ChannelMessage) => {
         // Channel được phép nhận tin nhắn

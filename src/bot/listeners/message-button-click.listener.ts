@@ -269,7 +269,7 @@ export class MessageButtonClickListener {
         cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
 
         const newAttemptCount = currentAttemptCount + 1;
-        cache.set(cacheKeySubmitCV, newAttemptCount);
+        cache.set(cacheKeySubmitCV, newAttemptCount); //Update cache
         this.logger.log(
           `User ${data.user_id} CV submitted. Attempt count updated to: ${newAttemptCount}`,
         );
