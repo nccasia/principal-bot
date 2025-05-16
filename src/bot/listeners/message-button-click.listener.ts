@@ -23,13 +23,14 @@ import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
 import { getCVSourceIdFromCVSourceValue } from '../utils/helper';
 import { getBranchIdFromBranchName } from '../utils/helper';
 import { getSubPositionIdFromSubPositionName } from '../utils/helper';
+import { UserLimitSubmitRepository } from '../repositories/user-limit-submit.repository';
 @Injectable()
 export class MessageButtonClickListener {
   protected client: MezonClient;
   protected readonly processedEvents = new Map<string, number>();
   private static processedSubmissions = new Map<string, number>();
-  private static CV_SUBMIT_LIMIT = 10;
-
+  private static CV_SUBMIT_LIMIT_CACHE = 10;
+  private static CV_SUBMIT_LIMIT_DB = 20;
   private readonly formSubmissionCleanUp = (now: number) => {
     const isProcessedEventsSizeGreaterThan100 = this.processedEvents.size > 100;
     if (isProcessedEventsSizeGreaterThan100) {
@@ -69,6 +70,7 @@ export class MessageButtonClickListener {
     private readonly eventEmitter: EventEmitter2,
     private readonly cvRepository: CvFormRepository,
     private readonly talentApiService: TalentApiService,
+    private readonly userLimitSubmitRepository: UserLimitSubmitRepository,
   ) {
     this.client = clientService.getClient();
   }
@@ -197,7 +199,7 @@ export class MessageButtonClickListener {
           `avatar-${messageId}-${data.user_id}`,
         );
 
-        // Limit user submit CV
+        // Limit user submit CV from cache
         const cacheKeySubmitCV = `attempt-submit-cv-${data.user_id}`;
         let currentAttemptCount = cache.get(cacheKeySubmitCV) as
           | number
@@ -207,11 +209,29 @@ export class MessageButtonClickListener {
           currentAttemptCount = 0;
         }
 
-        if (currentAttemptCount >= MessageButtonClickListener.CV_SUBMIT_LIMIT) {
+        if (
+          currentAttemptCount >=
+          MessageButtonClickListener.CV_SUBMIT_LIMIT_CACHE
+        ) {
           this.logger.log(
             `User ${data.user_id} has reached submission limit. Attempts: ${currentAttemptCount}`,
           );
-          await this.serverEditMessage(data, LimitSubmitCVEmbed);
+          await this.serverEditMessage(data, LimitSubmitCVEmbed(1));
+          return;
+        }
+
+        // Limit user submit CV from DB
+        const userAttemptSubmitCv =
+          await this.userLimitSubmitRepository.getUserAttemptSubmitCV(
+            data.email,
+          );
+        if (
+          userAttemptSubmitCv >= MessageButtonClickListener.CV_SUBMIT_LIMIT_DB
+        ) {
+          this.logger.log(
+            `User ${data.user_id} has reached submission limit. Attempts: ${userAttemptSubmitCv}`,
+          );
+          await this.serverEditMessage(data, LimitSubmitCVEmbed(2));
           return;
         }
 
@@ -268,10 +288,16 @@ export class MessageButtonClickListener {
         this.logger.log('Thông tin form:', formValues);
         cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
 
+        // Update cache
         const newAttemptCount = currentAttemptCount + 1;
         cache.set(cacheKeySubmitCV, newAttemptCount); //Update cache
         this.logger.log(
           `User ${data.user_id} CV submitted. Attempt count updated to: ${newAttemptCount}`,
+        );
+
+        // Update DB
+        await this.userLimitSubmitRepository.updateUserAttemptSubmitCV(
+          data.email,
         );
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);

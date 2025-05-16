@@ -267,10 +267,24 @@ export const ValidationErrorEmbed = (errorMessages: string[]): EmbedProps[] => {
   ];
 };
 
-export const LimitSubmitCVEmbed: EmbedProps[] = [
-  {
-    color: COLORS.Red,
-    title: '❌ Lỗi gửi CV',
-    description: 'Bạn đã gửi CV quá nhiều lần. Vui lòng thử lại sau 24 giờ.',
-  },
-];
+export const LimitSubmitCVEmbed = (type: number): EmbedProps[] => {
+  if (type === 1) {
+    return [
+      {
+        color: COLORS.Red,
+        title: '❌ Lỗi gửi CV',
+        description:
+          'Bạn đã gửi CV quá nhiều lần. Vui lòng thử lại sau 24 giờ.',
+      },
+    ];
+  } else if (type === 2) {
+    return [
+      {
+        color: COLORS.Red,
+        title: '❌ Lỗi gửi CV',
+        description:
+          'Bạn đã gửi vượt quá số lần cho phép. Vui lòng liên hệ admin để được hỗ trợ.',
+      },
+    ];
+  }
+};

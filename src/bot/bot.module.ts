@@ -18,6 +18,8 @@ import { CvFormController } from './controllers/cv-form.controller';
 import { CvFormService } from './services/cv-form.service';
 import { TalentApiService } from './services/talent-api.service';
 import { HttpModule } from '@nestjs/axios';
+import { UserEntity } from './entities/user.entity';
+import { UserLimitSubmitRepository } from './repositories/user-limit-submit.repository';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { HttpModule } from '@nestjs/axios';
       PositionEntity,
       CvSourceEntity,
       BranchPositionEntity,
+      UserEntity,
     ]),
     MulterModule.register({
       dest: './files',
@@ -47,6 +50,7 @@ import { HttpModule } from '@nestjs/axios';
     CvFormRepository,
     CvFormService,
     TalentApiService,
+    UserLimitSubmitRepository,
   ],
   exports: [Asterisk, CvFormRepository],
 })
