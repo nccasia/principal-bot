@@ -10,12 +10,14 @@ export class UserLimitSubmitRepository {
     private readonly userRepository: Repository<UserEntity>,
   ) {}
 
-  async updateUserAttemptSubmitCV(email: string) {
+  async updateUserAttemptSubmitCV(userId: string) {
     try {
-      let user = await this.userRepository.findOne({ where: { email } });
+      let user = await this.userRepository.findOne({
+        where: { user_id: userId },
+      });
       if (!user) {
         user = await this.userRepository.save({
-          email,
+          user_id: userId,
           total_cv_submitted: 1,
           max_allowed_cv_submitted: 20,
         });
@@ -29,12 +31,14 @@ export class UserLimitSubmitRepository {
     }
   }
 
-  async getUserAttemptSubmitCV(email: string) {
+  async getUserAttemptSubmitCV(userId: string) {
     try {
-      const user = await this.userRepository.findOne({ where: { email } });
+      const user = await this.userRepository.findOne({
+        where: { user_id: userId },
+      });
       if (!user) {
         await this.userRepository.save({
-          email,
+          user_id: userId,
           total_cv_submitted: 0,
           max_allowed_cv_submitted: 20,
         });

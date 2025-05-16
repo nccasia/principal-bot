@@ -6,20 +6,17 @@ export class UserEntity {
   id: number;
 
   @Column()
-  username: string;
+  user_id: string;
 
-  @Column()
-  email: string;
-
-  @Column()
+  @Column({ default: 0 })
   total_cv_submitted: number;
 
   @Column({ default: 20 })
   max_allowed_cv_submitted: number;
 
-  @Column()
+  @Column({ default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
-  @Column()
+  @Column({ default: () => 'CURRENT_TIMESTAMP' })
   updatedAt: Date;
 }

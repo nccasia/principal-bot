@@ -223,7 +223,7 @@ export class MessageButtonClickListener {
         // Limit user submit CV from DB
         const userAttemptSubmitCv =
           await this.userLimitSubmitRepository.getUserAttemptSubmitCV(
-            data.email,
+            data.user_id,
           );
         if (
           userAttemptSubmitCv >= MessageButtonClickListener.CV_SUBMIT_LIMIT_DB
@@ -297,7 +297,7 @@ export class MessageButtonClickListener {
 
         // Update DB
         await this.userLimitSubmitRepository.updateUserAttemptSubmitCV(
-          data.email,
+          data.user_id,
         );
       } catch (sendError) {
         this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);
