@@ -40,7 +40,7 @@
     "class-validator": "^0.14.2",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
-    "mezon-sdk": "^2.7.93",
+    "mezon-sdk": "^2.7.94",
     "node-cache": "^5.1.2",
     "pg": "^8.15.6",
     "reflect-metadata": "^0.2.2",
