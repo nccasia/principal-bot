@@ -94,3 +94,46 @@ export function getCVSourceIdFromCVSourceValue(
       throw new Error(`Unknown CV source value: ${cvSourceValue}`);
   }
 }
+
+export interface ButtonClickEventData {
+  message_id: string;
+  button_id: string;
+  user_id: string;
+  channel_id: string;
+  extra_data: string;
+}
+
+export const CACHE_DURATION = {
+  FIVE_MINUTES_MS: 300000,
+  FIVE_MINUTES_SECONDS: 300,
+  TWO_SECONDS_MS: 2000,
+  ONE_DAY_SECONDS: 86400,
+};
+
+export const SUBMISSION_LIMITS = {
+  CACHE_LIMIT: 10,
+  DATABASE_LIMIT: 20,
+};
+
+export const FORM_TYPES = {
+  CV: 'CV',
+};
+
+export const ACTIONS = {
+  SUBMIT: 'submit',
+  CANCEL: 'cancel',
+};
+
+export const FORM_FIELD_KEYS = [
+  'fullname',
+  'email',
+  'phone',
+  'candidate-type',
+  'position',
+  'branch',
+  'cv-source',
+  'dob',
+  'gender',
+  'address',
+  'note',
+];

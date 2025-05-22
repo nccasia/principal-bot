@@ -37,7 +37,7 @@ export class TalentApiService {
       const value = candidateData[key];
 
       if (value === undefined) {
-        continue; // Skip undefined properties for hashing
+        continue;
       }
 
       let processedValue;
@@ -46,7 +46,7 @@ export class TalentApiService {
       } else if (typeof value === 'boolean' || typeof value === 'number') {
         processedValue = String(value);
       } else {
-        processedValue = value; // Assumed string
+        processedValue = value;
       }
       formValues.push(`${key}=${processedValue}`);
     }
@@ -86,7 +86,7 @@ export class TalentApiService {
 
       Object.entries(candidateData).forEach(([key, value]) => {
         if (value === undefined) {
-          return; // Skip undefined properties for FormData
+          return;
         }
 
         let valueToAppend;
@@ -95,9 +95,6 @@ export class TalentApiService {
         } else if (typeof value === 'boolean' || typeof value === 'number') {
           valueToAppend = String(value);
         } else {
-          // Assuming value is already a string if not number, boolean, null, or undefined.
-          // If LinkCV or other fields could be something else (e.g. a File object for actual uploads),
-          // this part might need adjustment, but for now, DTO implies strings.
           valueToAppend = value;
         }
         formData.append(key, valueToAppend);

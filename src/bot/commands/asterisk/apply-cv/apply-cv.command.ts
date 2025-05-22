@@ -9,57 +9,94 @@ import {
 } from 'src/bot/utils/embed-props';
 import { Command } from 'src/bot/decorators/command-storage.decorator';
 import cache from 'src/bot/utils/shared-cache';
+import { CACHE_DURATION } from 'src/bot/utils/helper';
+
 @Command('guicv')
 export class ApplyCVCommand extends CommandMessage {
   private readonly logger = new Logger(ApplyCVCommand.name);
-  private formEmbed = BuildFormEmbed;
-  private componentsButton = BuildComponentsButton;
 
-  constructor(
-    // private readonly clientConfigService: MezonClientConfig,
-    private readonly mezonClient: MezonClientService,
-  ) {
+  constructor(private readonly mezonClient: MezonClientService) {
     super();
   }
 
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
-    const attachmentType = message.attachments[0].filetype;
-    const messageid = message.id;
-    const userId = message.sender_id;
+    const { attachments, id: messageId, sender_id: userId, avatar } = message;
 
-    const isValidFormat = validAttachmentTypes.includes(attachmentType);
-    if (!isValidFormat) {
-      return {
-        msg: {
-          content: 'Chỉ chấp nhận định dạng PDF hoặc DOCX.',
-        },
-      };
+    if (!this.isValidAttachment(attachments[0]?.filetype)) {
+      return this.replyWithError();
     }
 
-    // Cache URL + avatar CV
-    if (message.attachments[0]?.url) {
+    this.cacheUserData(messageId, userId, attachments[0]?.url, avatar);
+    this.trackUserSubmissionAttempt(userId);
+    this.logCacheData(messageId, userId);
+
+    return this.generateResponseMessage(messageId, message);
+  }
+
+  private isValidAttachment(filetype: string): boolean {
+    return validAttachmentTypes.includes(filetype);
+  }
+
+  private replyWithError() {
+    return {
+      msg: {
+        content: 'Chỉ chấp nhận định dạng PDF hoặc DOCX.',
+      },
+    };
+  }
+
+  private cacheUserData(
+    messageId: string,
+    userId: string,
+    attachmentUrl?: string,
+    avatar?: string,
+  ): void {
+    const cacheKeyPrefix = this.getCacheKeyPrefix(messageId, userId);
+
+    if (attachmentUrl) {
       cache.set(
-        `cv-attachment-${messageid}-${userId}`,
-        message.attachments[0].url,
-        600,
-      ); // 10 min
-    }
-    if (message.avatar) {
-      cache.set(`avatar-${messageid}-${userId}`, message.avatar, 600); // 10 min
-    }
-    // Cache user đã click button
-    cache.set(`valid-user-to-click-button-${messageid}-${userId}`, true, 600); // 10 min
-
-    // Limit user submit CV
-    const isUserAttemptSubmit = cache.has(`attempt-submit-cv-${userId}`);
-    if (!isUserAttemptSubmit) {
-      cache.set(`attempt-submit-cv-${userId}`, 0, 24 * 60 * 60); // 1 day
+        `cv-attachment-${cacheKeyPrefix}`,
+        attachmentUrl,
+        CACHE_DURATION.FIVE_MINUTES_SECONDS,
+      );
     }
 
-    this.logger.log('URL CV:', `cv-attachment-${messageid}-${userId}`);
-    this.logger.log('Avatar:', `avatar-${messageid}-${userId}`);
-    const embed = BuildFormEmbed(messageid);
-    const componentsButton = BuildComponentsButton(messageid);
+    if (avatar) {
+      cache.set(
+        `avatar-${cacheKeyPrefix}`,
+        avatar,
+        CACHE_DURATION.FIVE_MINUTES_SECONDS,
+      );
+    }
+
+    cache.set(
+      `valid-user-to-click-button-${cacheKeyPrefix}`,
+      true,
+      CACHE_DURATION.FIVE_MINUTES_SECONDS,
+    );
+  }
+
+  private getCacheKeyPrefix(messageId: string, userId: string): string {
+    return `${messageId}-${userId}`;
+  }
+
+  private trackUserSubmissionAttempt(userId: string): void {
+    const attemptCacheKey = `attempt-submit-cv-${userId}`;
+
+    if (!cache.has(attemptCacheKey)) {
+      cache.set(attemptCacheKey, 0, CACHE_DURATION.ONE_DAY_SECONDS);
+    }
+  }
+
+  private logCacheData(messageId: string, userId: string): void {
+    const cacheKeyPrefix = this.getCacheKeyPrefix(messageId, userId);
+    this.logger.log('URL CV:', `cv-attachment-${cacheKeyPrefix}`);
+    this.logger.log('Avatar:', `avatar-${cacheKeyPrefix}`);
+  }
+
+  private generateResponseMessage(messageId: string, message: ChannelMessage) {
+    const embed = BuildFormEmbed(messageId);
+    const componentsButton = BuildComponentsButton(messageId);
 
     return this.generateReplyMessage(
       {
