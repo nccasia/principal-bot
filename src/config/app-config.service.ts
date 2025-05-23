@@ -1,0 +1,79 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
+
+@Injectable()
+export class AppConfigService {
+  constructor(private configService: ConfigService) {}
+
+  get isDevelopment(): boolean {
+    return this.nodeEnv === 'development';
+  }
+
+  get isProduction(): boolean {
+    return this.nodeEnv === 'production';
+  }
+
+  get isTest(): boolean {
+    return this.nodeEnv === 'test';
+  }
+
+  get nodeEnv(): string {
+    return this.getString('NODE_ENV') || 'development';
+  }
+
+  get databaseConfig(): TypeOrmModuleOptions {
+    return {
+      type: 'postgres',
+      host: this.getString('DATABASE_HOST'),
+      port: this.getNumber('DATABASE_PORT'),
+      username: this.getString('DATABASE_USER'),
+      password: this.getString('DATABASE_PASSWORD'),
+      database: this.getString('DATABASE_NAME'),
+      autoLoadEntities: true,
+      synchronize: false,
+    };
+  }
+
+  get mezonConfig(): MezonClientConfig {
+    return {
+      token: this.getString('MEZON_TOKEN'),
+      channel_main_id: this.getString('CHANNEL_MAIN_ID'),
+      channel_test_id: this.getString('CHANNEL_TEST_ID'),
+      signature: this.getString('SIGNATURE'),
+      talent_api_url: this.getString('TALENT_API_URL'),
+    };
+  }
+
+  private getString(key: string): string {
+    const value = this.get(key);
+    return value.replaceAll('\\n', '\n');
+  }
+
+  private getNumber(key: string): number {
+    const value = this.get(key);
+    try {
+      return Number(value);
+    } catch {
+      throw new Error(`${key} environment variable is not a number`);
+    }
+  }
+
+  private getBoolean(key: string): boolean {
+    const value = this.get(key);
+    try {
+      return Boolean(JSON.parse(value));
+    } catch {
+      throw new Error(`${key} environment variable is not a boolean`);
+    }
+  }
+
+  private get(key: string): string {
+    const value = this.configService.get<string>(key);
+    if (value === undefined) {
+      throw new Error(`${key} environment variable does not exist`);
+    }
+    return value;
+  }
+}
