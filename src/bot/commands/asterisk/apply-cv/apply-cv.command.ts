@@ -1,4 +1,4 @@
-import { ChannelMessage } from 'mezon-sdk';
+import { ChannelMessage, MezonClient } from 'mezon-sdk';
 import { validAttachmentTypes } from './apply-cv.constant';
 import { CommandMessage } from 'src/bot/abstractions/commands/asterisk.abstract';
 import { MezonClientService } from 'src/mezon/services/client.service';
@@ -10,17 +10,25 @@ import {
 import { Command } from 'src/bot/decorators/command-storage.decorator';
 import cache from 'src/bot/utils/shared-cache';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
+import { FormExpirationHandler } from 'src/bot/utils/form-expiration-handler';
 
 @Command('guicv')
 export class ApplyCVCommand extends CommandMessage {
   private readonly logger = new Logger(ApplyCVCommand.name);
-
+  private readonly client: MezonClient;
   constructor(private readonly mezonClient: MezonClientService) {
     super();
+    this.client = mezonClient.getClient();
   }
 
   execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
-    const { attachments, id: messageId, sender_id: userId, avatar } = message;
+    const {
+      attachments,
+      id: messageId,
+      sender_id: userId,
+      avatar,
+      channel_id: channelId,
+    } = message;
 
     if (!this.isValidAttachment(attachments[0]?.filetype)) {
       return this.replyWithError();
@@ -29,6 +37,16 @@ export class ApplyCVCommand extends CommandMessage {
     this.cacheUserData(messageId, userId, attachments[0]?.url, avatar);
     this.trackUserSubmissionAttempt(userId);
     this.logCacheData(messageId, userId);
+
+    FormExpirationHandler.startExpirationTimer(
+      messageId,
+      userId,
+      this.client,
+      channelId,
+    );
+    this.logger.log(
+      `Started expiration timer for form ${messageId} for user ${userId}`,
+    );
 
     return this.generateResponseMessage(messageId, message);
   }

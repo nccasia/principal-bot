@@ -11,6 +11,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { validAttachmentTypes } from 'src/bot/commands/asterisk/apply-cv/apply-cv.constant';
 import { AppConfigService } from 'src/config/app-config.service';
+import cache from 'src/bot/utils/shared-cache';
+import { CACHE_DURATION } from 'src/bot/utils/helper';
 
 @Injectable()
 export class MezonClientService {
@@ -20,7 +22,6 @@ export class MezonClientService {
   private processedButtonEvents = new Map<string, number>();
   private channel_test: TextChannel;
 
-  // Static property to ensure we only initialize once across all instances
   private static isInitialized = false;
 
   constructor(
@@ -46,7 +47,6 @@ export class MezonClientService {
   }
 
   async initializeClient() {
-    // Prevent duplicate initialization using static property
     if (MezonClientService.isInitialized) {
       this.logger.warn(
         'Mezon client already globally initialized, skipping duplicate initialization',
@@ -54,7 +54,6 @@ export class MezonClientService {
       return true;
     }
 
-    // Prevent duplicate initialization using instance property
     if ((this as any)._clientInitialized) {
       this.logger.warn(
         'Mezon client already initialized for this instance, skipping duplicate initialization',
@@ -72,7 +71,6 @@ export class MezonClientService {
       this.setupUserChannelAddedHandler();
       this.setupChannelMessageHandler();
 
-      // Mark as initialized on both instance and class level
       (this as any)._clientInitialized = true;
       MezonClientService.isInitialized = true;
       this.logger.log('Mezon client fully initialized');
@@ -85,7 +83,6 @@ export class MezonClientService {
   }
 
   private setupButtonEventHandlers() {
-    // Check if event handler is already registered to prevent duplicates
     if ((this.client as any)._buttonEventHandlerRegistered) {
       this.logger.warn(
         'Button event handler already registered, skipping duplicate registration',
@@ -94,28 +91,17 @@ export class MezonClientService {
     }
 
     this.client.on('message_button_clicked', (data) => {
-      const eventId = this.createButtonEventId(data);
       const now = Date.now();
 
-      if (this.isButtonEventDuplicate(eventId, now)) {
-        return;
-      }
-
-      this.recordButtonEvent(eventId, now);
-      this.cleanupButtonEvents(now);
-
-      // Add timestamp to the event data to help with deduplication downstream
       const enrichedData = {
         ...data,
         _timestamp: now,
-        _eventId: eventId,
       };
 
       this.logger.log('Button clicked:', enrichedData);
       this.eventEmitter.emit('message_button_clicked', enrichedData);
     });
 
-    // Mark handler as registered
     (this.client as any)._buttonEventHandlerRegistered = true;
     this.logger.log('Button event handler registered successfully');
   }
@@ -151,7 +137,6 @@ export class MezonClientService {
   }
 
   private setupReadyEventHandler() {
-    // Check if event handler is already registered to prevent duplicates
     if ((this.client as any)._readyEventHandlerRegistered) {
       this.logger.warn(
         'Ready event handler already registered, skipping duplicate registration',
@@ -207,29 +192,12 @@ export class MezonClientService {
       return;
     }
 
-    const processedMessages = new Map<string, number>();
-
     this.client.onChannelMessage(async (message: ChannelMessage) => {
-      const messageId = message.message_id;
-      const now = Date.now();
-
-      if (processedMessages.has(messageId)) {
-        const lastProcessed = processedMessages.get(messageId);
-        if (now - lastProcessed < 5000) {
-          this.logger.log(`Skipping duplicate message: ${messageId}`);
-          return;
-        }
-      }
-
-      processedMessages.set(messageId, now);
-
-      if (processedMessages.size > 100) {
-        const fiveMinutesAgo = now - 300000;
-        for (const [key, timestamp] of processedMessages.entries()) {
-          if (timestamp < fiveMinutesAgo) {
-            processedMessages.delete(key);
-          }
-        }
+      if (
+        message.sender_id === '1840677387214262272' ||
+        message.username === 'Principal'
+      ) {
+        return;
       }
 
       if (!this.isMessageFromAllowedChannel(message)) {
@@ -437,7 +405,20 @@ export class MezonClientService {
     try {
       const channel = await channelRep;
       const messageObj = await channel.messages.fetch(message.message_id);
-      await messageObj.reply(content);
+      const responseMessage = await messageObj.reply(content);
+
+      // Cache the response message ID for expiration handler
+      if (responseMessage && responseMessage.message_id) {
+        const cacheKey = `response-message-${message.id}-${message.sender_id}`;
+        cache.set(
+          cacheKey,
+          responseMessage.message_id,
+          CACHE_DURATION.FIVE_MINUTES_SECONDS,
+        );
+        this.logger.log(
+          `Cached response message ID: ${responseMessage.message_id} for command ${message.id}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Error in sendReply:', error);
     }

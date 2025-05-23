@@ -288,3 +288,11 @@ export const LimitSubmitCVEmbed = (type: number): EmbedProps[] => {
     ];
   }
 };
+
+export const ExpiredFormEmbed: EmbedProps[] = [
+  {
+    color: COLORS.Red,
+    title: '❌ Lỗi gửi CV',
+    description: 'Bạn đã hết thời gian nhập CV. Vui lòng gửi lại.',
+  },
+];

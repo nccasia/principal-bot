@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -34,6 +33,7 @@ import {
   FORM_FIELD_KEYS,
   ButtonClickEventData,
 } from '../utils/helper';
+import { FormExpirationHandler } from '../utils/form-expiration-handler';
 
 @Injectable()
 export class MessageButtonClickListener {
@@ -386,6 +386,11 @@ export class MessageButtonClickListener {
     messageId: string,
   ): void {
     cache.del(`valid-user-to-click-button-${messageId}-${userId}`);
+    cache.del(`cv-attachment-${messageId}-${userId}`);
+    cache.del(`avatar-${messageId}-${userId}`);
+    cache.del(`response-message-${messageId}-${userId}`);
+
+    FormExpirationHandler.clearFormTimer(messageId, userId);
   }
 
   private async updateSubmissionCounters(userId: string): Promise<void> {
@@ -422,6 +427,9 @@ export class MessageButtonClickListener {
       this.logger.log('Đã gửi thông báo hủy form CV');
 
       cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
+      cache.del(`response-message-${messageId}-${data.user_id}`);
+
+      FormExpirationHandler.clearFormTimer(messageId, data.user_id);
     } catch (error) {
       this.logger.error('Lỗi trong handleCancelCV:', error);
       const cancelActionId = `cancel_${messageId}_${data.user_id}`;
