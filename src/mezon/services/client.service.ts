@@ -11,8 +11,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { validAttachmentTypes } from 'src/bot/commands/asterisk/apply-cv/apply-cv.constant';
 import { AppConfigService } from 'src/config/app-config.service';
-import cache from 'src/bot/utils/shared-cache';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
+import { CachingService } from 'src/common/services/caching.service';
 
 @Injectable()
 export class MezonClientService {
@@ -28,6 +28,7 @@ export class MezonClientService {
     private appConfigService: AppConfigService,
     private readonly asterisk: Asterisk,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cachingService: CachingService,
   ) {
     this.logger.log(
       `MezonClientService constructor called, instance: ${Math.random().toString(36).substring(7)}`,
@@ -193,10 +194,10 @@ export class MezonClientService {
     }
 
     this.client.onChannelMessage(async (message: ChannelMessage) => {
-      if (
-        message.sender_id === '1840677387214262272' ||
-        message.username === 'Principal'
-      ) {
+      const avoidProcessingBotMessage =
+        message.sender_id === this.config.bot_id ||
+        message.username === this.config.bot_username;
+      if (avoidProcessingBotMessage) {
         return;
       }
 
@@ -343,7 +344,7 @@ export class MezonClientService {
     channelRep: Promise<TextChannel>,
   ) {
     try {
-      const result = this.asterisk.execute(message.content.t, message);
+      const result = await this.asterisk.execute(message.content.t, message);
       this.logger.log(`Command result: ${JSON.stringify(result)}`);
 
       if (result && result.msg) {
@@ -407,10 +408,9 @@ export class MezonClientService {
       const messageObj = await channel.messages.fetch(message.message_id);
       const responseMessage = await messageObj.reply(content);
 
-      // Cache the response message ID for expiration handler
       if (responseMessage && responseMessage.message_id) {
         const cacheKey = `response-message-${message.id}-${message.sender_id}`;
-        cache.set(
+        await this.cachingService.set(
           cacheKey,
           responseMessage.message_id,
           CACHE_DURATION.FIVE_MINUTES_SECONDS,

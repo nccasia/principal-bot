@@ -4,7 +4,6 @@ import { DiscoveryModule } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MulterModule } from '@nestjs/platform-express';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MezonModule } from 'src/mezon/mezon.module';
 import { Asterisk } from './commands/asterisk/asterisk';
 import { ApplyCVCommand } from './commands/asterisk/apply-cv/apply-cv.command';
 import { MessageButtonClickListener } from './listeners/message-button-click.listener';
@@ -20,6 +19,7 @@ import { TalentApiService } from './services/talent-api.service';
 import { HttpModule } from '@nestjs/axios';
 import { UserEntity } from './entities/user.entity';
 import { UserLimitSubmitRepository } from './repositories/user-limit-submit.repository';
+import { FormExpirationHandler } from './utils/form-expiration-handler';
 
 @Module({
   imports: [
@@ -36,9 +36,6 @@ import { UserLimitSubmitRepository } from './repositories/user-limit-submit.repo
     }),
     DiscoveryModule,
     ConfigModule,
-    MezonModule.forRootAsync({
-      imports: [ConfigModule],
-    }),
     EventEmitterModule.forRoot(),
     HttpModule,
   ],
@@ -51,6 +48,7 @@ import { UserLimitSubmitRepository } from './repositories/user-limit-submit.repo
     CvFormService,
     TalentApiService,
     UserLimitSubmitRepository,
+    FormExpirationHandler,
   ],
   exports: [Asterisk, CvFormRepository],
 })

@@ -8,20 +8,29 @@ import {
   BuildFormEmbed,
 } from 'src/bot/utils/embed-props';
 import { Command } from 'src/bot/decorators/command-storage.decorator';
-import cache from 'src/bot/utils/shared-cache';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
 import { FormExpirationHandler } from 'src/bot/utils/form-expiration-handler';
+import { CachingService } from 'src/common/services/caching.service';
 
 @Command('guicv')
 export class ApplyCVCommand extends CommandMessage {
   private readonly logger = new Logger(ApplyCVCommand.name);
   private readonly client: MezonClient;
-  constructor(private readonly mezonClient: MezonClientService) {
+  constructor(
+    private readonly mezonClient: MezonClientService,
+    private readonly cachingService: CachingService,
+  ) {
     super();
     this.client = mezonClient.getClient();
+    this.logger.log(
+      `ApplyCVCommand using CachingService instance: ${this.cachingService.instanceId}`,
+    );
   }
 
-  execute(args: string | boolean | any[] | string[], message: ChannelMessage) {
+  async execute(
+    args: string | boolean | any[] | string[],
+    message: ChannelMessage,
+  ) {
     const {
       attachments,
       id: messageId,
@@ -34,11 +43,11 @@ export class ApplyCVCommand extends CommandMessage {
       return this.replyWithError();
     }
 
-    this.cacheUserData(messageId, userId, attachments[0]?.url, avatar);
-    this.trackUserSubmissionAttempt(userId);
-    this.logCacheData(messageId, userId);
+    await this.cacheUserData(messageId, userId, attachments[0]?.url, avatar);
+    await this.trackUserSubmissionAttempt(userId);
+    await this.logCacheData(messageId, userId);
 
-    FormExpirationHandler.startExpirationTimer(
+    new FormExpirationHandler(this.cachingService).startExpirationTimer(
       messageId,
       userId,
       this.client,
@@ -63,58 +72,76 @@ export class ApplyCVCommand extends CommandMessage {
     };
   }
 
-  private cacheUserData(
+  private async cacheUserData(
     messageId: string,
     userId: string,
     attachmentUrl?: string,
     avatar?: string,
-  ): void {
+  ): Promise<void> {
     const cacheKeyPrefix = this.getCacheKeyPrefix(messageId, userId);
 
     if (attachmentUrl) {
-      cache.set(
-        `cv-attachment-${cacheKeyPrefix}`,
+      const cvCacheKey = `cv-attachment-${cacheKeyPrefix}`;
+      await this.cachingService.set(
+        cvCacheKey,
         attachmentUrl,
-        CACHE_DURATION.FIVE_MINUTES_SECONDS,
+        CACHE_DURATION.FIVE_MINUTES_MS,
       );
+      this.logger.log(`Cached CV URL for key ${cvCacheKey}: ${attachmentUrl}`);
     }
 
     if (avatar) {
-      cache.set(
-        `avatar-${cacheKeyPrefix}`,
+      const avatarCacheKey = `avatar-${cacheKeyPrefix}`;
+      await this.cachingService.set(
+        avatarCacheKey,
         avatar,
-        CACHE_DURATION.FIVE_MINUTES_SECONDS,
+        CACHE_DURATION.FIVE_MINUTES_MS,
       );
+      this.logger.log(`Cached Avatar URL for key ${avatarCacheKey}: ${avatar}`);
     }
-
-    cache.set(
-      `valid-user-to-click-button-${cacheKeyPrefix}`,
-      true,
-      CACHE_DURATION.FIVE_MINUTES_SECONDS,
-    );
   }
 
   private getCacheKeyPrefix(messageId: string, userId: string): string {
     return `${messageId}-${userId}`;
   }
 
-  private trackUserSubmissionAttempt(userId: string): void {
+  private async trackUserSubmissionAttempt(userId: string): Promise<void> {
     const attemptCacheKey = `attempt-submit-cv-${userId}`;
 
-    if (!cache.has(attemptCacheKey)) {
-      cache.set(attemptCacheKey, 0, CACHE_DURATION.ONE_DAY_SECONDS);
+    if (!(await this.cachingService.has(attemptCacheKey))) {
+      await this.cachingService.set(
+        attemptCacheKey,
+        0,
+        CACHE_DURATION.ONE_DAY_SECONDS,
+      );
     }
   }
 
-  private logCacheData(messageId: string, userId: string): void {
+  private async logCacheData(messageId: string, userId: string): Promise<void> {
     const cacheKeyPrefix = this.getCacheKeyPrefix(messageId, userId);
-    this.logger.log('URL CV:', `cv-attachment-${cacheKeyPrefix}`);
-    this.logger.log('Avatar:', `avatar-${cacheKeyPrefix}`);
+    const cvAttachmentKey = `cv-attachment-${cacheKeyPrefix}`;
+    const avatarKey = `avatar-${cacheKeyPrefix}`;
+
+    const cachedCvUrl = await this.cachingService.get(cvAttachmentKey);
+    const cachedAvatarUrl = await this.cachingService.get(avatarKey);
+
+    this.logger.log('Attempting to retrieve from cache for logging:');
+    this.logger.log(
+      `Key for CV URL: ${cvAttachmentKey}, Retrieved Value:`,
+      cachedCvUrl,
+    );
+    this.logger.log(
+      `Key for Avatar URL: ${avatarKey}, Retrieved Value:`,
+      cachedAvatarUrl,
+    );
   }
 
   private generateResponseMessage(messageId: string, message: ChannelMessage) {
     const embed = BuildFormEmbed(messageId);
-    const componentsButton = BuildComponentsButton(messageId);
+    const componentsButton = BuildComponentsButton(
+      messageId,
+      message.sender_id,
+    );
 
     return this.generateReplyMessage(
       {

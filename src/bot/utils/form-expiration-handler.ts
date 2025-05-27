@@ -3,16 +3,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MezonClient } from 'mezon-sdk';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
-import cache from './shared-cache';
 import { ExpiredFormEmbed } from './embed-props';
 import { CACHE_DURATION } from './helper';
+import { CachingService } from 'src/common/services/caching.service';
 
 @Injectable()
 export class FormExpirationHandler {
   private static readonly logger = new Logger(FormExpirationHandler.name);
   private static expirationTimers: Map<string, NodeJS.Timeout> = new Map();
 
-  static startExpirationTimer(
+  constructor(private readonly cachingService: CachingService) {}
+
+  startExpirationTimer(
     commandId: string,
     userId: string,
     client: MezonClient,
@@ -24,33 +26,33 @@ export class FormExpirationHandler {
 
     const timer = setTimeout(async () => {
       try {
-        const isFormStillValid = cache.get(
+        const isFormStillValid = await this.cachingService.get(
           `valid-user-to-click-button-${timerKey}`,
         );
         if (!isFormStillValid) {
-          this.logger.log(
+          FormExpirationHandler.logger.log(
             `Form ${commandId} for user ${userId} already processed, skipping expiration`,
           );
           return;
         }
 
-        this.logger.log(
+        FormExpirationHandler.logger.log(
           `Form ${commandId} for user ${userId} has expired after 5 minutes`,
         );
 
         try {
-          const responseMessageId = cache.get(
+          const responseMessageId = (await this.cachingService.get(
             `response-message-${commandId}-${userId}`,
-          ) as string;
+          )) as string;
           const targetMessageId = responseMessageId || commandId;
 
-          this.logger.log(
+          FormExpirationHandler.logger.log(
             `Using message ID ${targetMessageId} to expire form (original: ${commandId}, response: ${responseMessageId || 'not found'})`,
           );
 
           const channel = await client.channels.fetch(channelId);
           if (!channel) {
-            this.logger.error(
+            FormExpirationHandler.logger.error(
               `Could not find channel ${channelId} to expire form`,
             );
             return;
@@ -60,7 +62,7 @@ export class FormExpirationHandler {
             targetMessageId,
           );
           if (!message) {
-            this.logger.error(
+            FormExpirationHandler.logger.error(
               `Could not find message ${targetMessageId} to expire form`,
             );
             return;
@@ -71,49 +73,57 @@ export class FormExpirationHandler {
             components: [],
           });
 
-          cache.del(`valid-user-to-click-button-${timerKey}`);
-          cache.del(`cv-attachment-${timerKey}`);
-          cache.del(`avatar-${timerKey}`);
-          cache.del(`response-message-${commandId}-${userId}`);
+          await this.cachingService.del(
+            `valid-user-to-click-button-${timerKey}`,
+          );
+          await this.cachingService.del(`cv-attachment-${timerKey}`);
+          await this.cachingService.del(`avatar-${timerKey}`);
+          await this.cachingService.del(
+            `response-message-${commandId}-${userId}`,
+          );
 
-          this.logger.log(
+          FormExpirationHandler.logger.log(
             `Successfully expired form ${commandId} for user ${userId}`,
           );
         } catch (error) {
-          this.logger.error(
+          FormExpirationHandler.logger.error(
             `Error expiring form ${commandId} for user ${userId}:`,
             error,
           );
 
           if (error instanceof Error) {
-            this.logger.error(`Error message: ${error.message}`);
+            FormExpirationHandler.logger.error(
+              `Error message: ${error.message}`,
+            );
           }
         }
       } finally {
-        this.expirationTimers.delete(timerKey);
+        FormExpirationHandler.expirationTimers.delete(timerKey);
       }
     }, CACHE_DURATION.FIVE_MINUTES_MS);
 
-    this.expirationTimers.set(timerKey, timer);
+    FormExpirationHandler.expirationTimers.set(timerKey, timer);
 
-    this.logger.log(
+    FormExpirationHandler.logger.log(
       `Started 5-minute expiration timer for form ${commandId} (user: ${userId})`,
     );
   }
 
-  static clearExpirationTimer(timerKey: string): void {
-    const existingTimer = this.expirationTimers.get(timerKey);
+  clearExpirationTimer(timerKey: string): void {
+    const existingTimer = FormExpirationHandler.expirationTimers.get(timerKey);
     if (existingTimer) {
       clearTimeout(existingTimer);
-      this.expirationTimers.delete(timerKey);
-      this.logger.log(`Cleared existing expiration timer for ${timerKey}`);
+      FormExpirationHandler.expirationTimers.delete(timerKey);
+      FormExpirationHandler.logger.log(
+        `Cleared existing expiration timer for ${timerKey}`,
+      );
     }
   }
 
-  static clearFormTimer(messageId: string, userId: string): void {
+  async clearFormTimer(messageId: string, userId: string): Promise<void> {
     const timerKey = `${messageId}-${userId}`;
     this.clearExpirationTimer(timerKey);
 
-    cache.del(`response-message-${messageId}-${userId}`);
+    await this.cachingService.del(`response-message-${messageId}-${userId}`);
   }
 }

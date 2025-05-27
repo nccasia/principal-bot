@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { CACHE_DURATION } from 'src/bot/utils/helper';
 import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
 
 @Injectable()
@@ -43,6 +44,18 @@ export class AppConfigService {
       channel_test_id: this.getString('CHANNEL_TEST_ID'),
       signature: this.getString('SIGNATURE'),
       talent_api_url: this.getString('TALENT_API_URL'),
+      bot_id: this.getString('BOT_ID'),
+      bot_username: this.getString('BOT_USERNAME'),
+    };
+  }
+
+  get redisConfig() {
+    return {
+      host: this.getString('REDIS_HOST'),
+      port: this.getNumber('REDIS_PORT'),
+      password: this.getString('REDIS_PASSWORD'),
+      db: this.getNumber('REDIS_DB'),
+      ttl: CACHE_DURATION.FIVE_MINUTES_MS,
     };
   }
 
