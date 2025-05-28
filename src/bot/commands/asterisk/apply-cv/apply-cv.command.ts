@@ -19,6 +19,7 @@ export class ApplyCVCommand extends CommandMessage {
   constructor(
     private readonly mezonClient: MezonClientService,
     private readonly cachingService: CachingService,
+    private readonly formExpirationHandler: FormExpirationHandler,
   ) {
     super();
     this.client = mezonClient.getClient();
@@ -47,7 +48,7 @@ export class ApplyCVCommand extends CommandMessage {
     await this.trackUserSubmissionAttempt(userId);
     await this.logCacheData(messageId, userId);
 
-    new FormExpirationHandler(this.cachingService).startExpirationTimer(
+    this.formExpirationHandler.startExpirationTimer(
       messageId,
       userId,
       this.client,
@@ -112,7 +113,7 @@ export class ApplyCVCommand extends CommandMessage {
       await this.cachingService.set(
         attemptCacheKey,
         0,
-        CACHE_DURATION.ONE_DAY_SECONDS,
+        CACHE_DURATION.ONE_DAY_MS,
       );
     }
   }

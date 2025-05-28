@@ -413,7 +413,7 @@ export class MezonClientService {
         await this.cachingService.set(
           cacheKey,
           responseMessage.message_id,
-          CACHE_DURATION.FIVE_MINUTES_SECONDS,
+          CACHE_DURATION.FIVE_MINUTES_MS,
         );
         this.logger.log(
           `Cached response message ID: ${responseMessage.message_id} for command ${message.id}`,

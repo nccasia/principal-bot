@@ -27,7 +27,7 @@ export class FormExpirationHandler {
     const timer = setTimeout(async () => {
       try {
         const isFormStillValid = await this.cachingService.get(
-          `valid-user-to-click-button-${timerKey}`,
+          `cv-attachment-${timerKey}`,
         );
         if (!isFormStillValid) {
           FormExpirationHandler.logger.log(
@@ -44,10 +44,10 @@ export class FormExpirationHandler {
           const responseMessageId = (await this.cachingService.get(
             `response-message-${commandId}-${userId}`,
           )) as string;
-          const targetMessageId = responseMessageId || commandId;
+          const targetMessageId = responseMessageId;
 
           FormExpirationHandler.logger.log(
-            `Using message ID ${targetMessageId} to expire form (original: ${commandId}, response: ${responseMessageId || 'not found'})`,
+            `Using message ID ${targetMessageId} to expire form (original: ${commandId}, response: ${responseMessageId})`,
           );
 
           const channel = await client.channels.fetch(channelId);
@@ -73,9 +73,6 @@ export class FormExpirationHandler {
             components: [],
           });
 
-          await this.cachingService.del(
-            `valid-user-to-click-button-${timerKey}`,
-          );
           await this.cachingService.del(`cv-attachment-${timerKey}`);
           await this.cachingService.del(`avatar-${timerKey}`);
           await this.cachingService.del(
