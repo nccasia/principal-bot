@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { BotModule } from './bot/bot.module';
-import { RestModule } from './rest/rest.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from './config/config.module';
 import { AppConfigService } from './config/app-config.service';
@@ -21,7 +20,6 @@ import { CommonModule } from './common/common.module';
       imports: [ConfigModule],
     }),
     BotModule,
-    RestModule,
   ],
   controllers: [],
   providers: [],

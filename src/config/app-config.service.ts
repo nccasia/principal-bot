@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
 import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
+import { redisStore } from 'cache-manager-ioredis-yet';
 
 @Injectable()
 export class AppConfigService {
@@ -51,6 +52,7 @@ export class AppConfigService {
 
   get redisConfig() {
     return {
+      store: redisStore,
       host: this.getString('REDIS_HOST'),
       port: this.getNumber('REDIS_PORT'),
       password: this.getString('REDIS_PASSWORD'),

@@ -1,8 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-misused-promises */
 import { Injectable, Logger } from '@nestjs/common';
 import { MezonClient } from 'mezon-sdk';
-import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { ExpiredFormEmbed } from './embed-props';
 import { CACHE_DURATION } from './helper';
 import { CachingService } from 'src/common/services/caching.service';
@@ -24,79 +21,84 @@ export class FormExpirationHandler {
 
     this.clearExpirationTimer(timerKey);
 
-    const timer = setTimeout(async () => {
-      try {
-        const isFormStillValid = await this.cachingService.get(
-          `cv-attachment-${timerKey}`,
-        );
-        if (!isFormStillValid) {
-          FormExpirationHandler.logger.log(
-            `Form ${commandId} for user ${userId} already processed, skipping expiration`,
-          );
-          return;
-        }
-
-        FormExpirationHandler.logger.log(
-          `Form ${commandId} for user ${userId} has expired after 5 minutes`,
-        );
-
+    const timer = setTimeout(() => {
+      (async () => {
         try {
-          const responseMessageId = (await this.cachingService.get(
-            `response-message-${commandId}-${userId}`,
-          )) as string;
-          const targetMessageId = responseMessageId;
-
-          FormExpirationHandler.logger.log(
-            `Using message ID ${targetMessageId} to expire form (original: ${commandId}, response: ${responseMessageId})`,
+          const isFormStillValid = await this.cachingService.get(
+            `cv-attachment-${timerKey}`,
           );
-
-          const channel = await client.channels.fetch(channelId);
-          if (!channel) {
-            FormExpirationHandler.logger.error(
-              `Could not find channel ${channelId} to expire form`,
+          if (!isFormStillValid) {
+            FormExpirationHandler.logger.log(
+              `Form ${commandId} for user ${userId} already processed, skipping expiration`,
             );
             return;
           }
 
-          const message = await (channel as TextChannel).messages.fetch(
-            targetMessageId,
-          );
-          if (!message) {
-            FormExpirationHandler.logger.error(
-              `Could not find message ${targetMessageId} to expire form`,
-            );
-            return;
-          }
-
-          await message.update({
-            embed: ExpiredFormEmbed,
-            components: [],
-          });
-
-          await this.cachingService.del(`cv-attachment-${timerKey}`);
-          await this.cachingService.del(`avatar-${timerKey}`);
-          await this.cachingService.del(
-            `response-message-${commandId}-${userId}`,
-          );
-
           FormExpirationHandler.logger.log(
-            `Successfully expired form ${commandId} for user ${userId}`,
-          );
-        } catch (error) {
-          FormExpirationHandler.logger.error(
-            `Error expiring form ${commandId} for user ${userId}:`,
-            error,
+            `Form ${commandId} for user ${userId} has expired after 5 minutes`,
           );
 
-          if (error instanceof Error) {
-            FormExpirationHandler.logger.error(
-              `Error message: ${error.message}`,
+          try {
+            const responseMessageId = await this.cachingService.get<string>(
+              `response-message-${commandId}-${userId}`,
             );
+            const targetMessageId = responseMessageId;
+
+            FormExpirationHandler.logger.log(
+              `Using message ID ${targetMessageId} to expire form (original: ${commandId}, response: ${responseMessageId})`,
+            );
+
+            const channel = await client.channels.fetch(channelId);
+            if (!channel) {
+              FormExpirationHandler.logger.error(
+                `Could not find channel ${channelId} to expire form`,
+              );
+              return;
+            }
+
+            const message = await channel.messages.fetch(targetMessageId);
+            if (!message) {
+              FormExpirationHandler.logger.error(
+                `Could not find message ${targetMessageId} to expire form`,
+              );
+              return;
+            }
+
+            await message.update({
+              embed: ExpiredFormEmbed,
+              components: [],
+            });
+
+            await this.cachingService.del(`cv-attachment-${timerKey}`);
+            await this.cachingService.del(`avatar-${timerKey}`);
+            await this.cachingService.del(
+              `response-message-${commandId}-${userId}`,
+            );
+
+            FormExpirationHandler.logger.log(
+              `Successfully expired form ${commandId} for user ${userId}`,
+            );
+          } catch (error) {
+            FormExpirationHandler.logger.error(
+              `Error expiring form ${commandId} for user ${userId}:`,
+              error,
+            );
+
+            if (error instanceof Error) {
+              FormExpirationHandler.logger.error(
+                `Error message: ${error.message}`,
+              );
+            }
           }
+        } finally {
+          FormExpirationHandler.expirationTimers.delete(timerKey);
         }
-      } finally {
-        FormExpirationHandler.expirationTimers.delete(timerKey);
-      }
+      })().catch((iifeError) => {
+        FormExpirationHandler.logger.error(
+          `Unhandled error in form expiration IIFE for ${timerKey}:`,
+          iifeError,
+        );
+      });
     }, CACHE_DURATION.FIVE_MINUTES_MS);
 
     FormExpirationHandler.expirationTimers.set(timerKey, timer);

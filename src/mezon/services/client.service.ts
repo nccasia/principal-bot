@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { MezonClientConfig } from '../dtos/mezon-client-config';
 import { ChannelMessage, MezonClient } from 'mezon-sdk';
@@ -13,6 +8,7 @@ import { validAttachmentTypes } from 'src/bot/commands/asterisk/apply-cv/apply-c
 import { AppConfigService } from 'src/config/app-config.service';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
 import { CachingService } from 'src/common/services/caching.service';
+import { MezonReplyMessage } from 'src/bot/dtos/reply-message.dto';
 
 @Injectable()
 export class MezonClientService {
@@ -97,7 +93,7 @@ export class MezonClientService {
       const enrichedData = {
         ...data,
         _timestamp: now,
-      };
+      } as unknown as object;
 
       this.logger.log('Button clicked:', enrichedData);
       this.eventEmitter.emit('message_button_clicked', enrichedData);
@@ -172,11 +168,11 @@ export class MezonClientService {
       return;
     }
 
-    this.client.onUserChannelAdded((event) => {
+    this.client.onUserChannelAdded(async (event) => {
       const user = event.users[0];
       const channelName = event.channel_desc.clan_name;
 
-      this.channel_test.send({
+      await this.channel_test.send({
         t: `Xin chào ${user.username}! Chào mừng bạn đến với kênh ${channelName}. Hãy sử dụng lệnh *guicv và đính kèm 01 file (.docx hoặc .pdf) để gửi CV của bạn.`,
       });
     });
@@ -344,12 +340,15 @@ export class MezonClientService {
     channelRep: Promise<TextChannel>,
   ) {
     try {
-      const result = await this.asterisk.execute(message.content.t, message);
+      const result = (await this.asterisk.execute(
+        message.content.t,
+        message,
+      )) as MezonReplyMessage;
       this.logger.log(`Command result: ${JSON.stringify(result)}`);
 
       if (result && result.msg) {
         try {
-          await this.sendReply(channelRep, result.msg, message);
+          await this.sendReply(channelRep, result.msg as object, message);
           this.logger.log('Reply message sent successfully');
         } catch (sendError) {
           this.logger.error('Error sending reply:', sendError);
