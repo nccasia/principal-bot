@@ -225,11 +225,14 @@ export const BuildFormEmbed = (messageid: string): EmbedProps[] => [
   },
 ];
 
-export const BuildComponentsButton = (messageid: string) => [
+export const BuildComponentsButton = (
+  originalCommandMessageId: string,
+  originalSenderId: string,
+) => [
   {
     components: [
       {
-        id: `CV_${messageid}_cancel`,
+        id: `CV-${originalCommandMessageId}-${originalSenderId}-cancel`,
         type: EMessageComponentType.BUTTON,
         component: {
           label: `Cancel`,
@@ -237,7 +240,7 @@ export const BuildComponentsButton = (messageid: string) => [
         },
       },
       {
-        id: `CV_${messageid}_submit`,
+        id: `CV-${originalCommandMessageId}-${originalSenderId}-submit`,
         type: EMessageComponentType.BUTTON,
         component: {
           label: `Submit`,
@@ -288,3 +291,11 @@ export const LimitSubmitCVEmbed = (type: number): EmbedProps[] => {
     ];
   }
 };
+
+export const ExpiredFormEmbed: EmbedProps[] = [
+  {
+    color: COLORS.Red,
+    title: '❌ Lỗi gửi CV',
+    description: 'Bạn đã hết thời gian nhập CV. Vui lòng gửi lại.',
+  },
+];

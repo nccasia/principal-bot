@@ -27,7 +27,7 @@ export class UserLimitSubmitRepository {
       user.total_cv_submitted = user.total_cv_submitted + 1;
       return this.userRepository.save(user);
     } catch (error) {
-      throw new Error('Error updating user attempt submit CV', error);
+      throw new Error('Error updating user attempt submit CV', error as Error);
     }
   }
 
@@ -46,7 +46,7 @@ export class UserLimitSubmitRepository {
       }
       return user.total_cv_submitted;
     } catch (error) {
-      throw new Error('Error getting user attempt submit CV', error);
+      throw new Error('Error getting user attempt submit CV', error as Error);
     }
   }
 }

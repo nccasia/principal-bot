@@ -1,5 +1,11 @@
 import { plainToInstance } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsString, validateSync } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  validateSync,
+} from 'class-validator';
 
 export class EnvironmentVariables {
   @IsString({ message: 'DATABASE_HOST must be a string' })
@@ -38,9 +44,32 @@ export class EnvironmentVariables {
   @IsNotEmpty({ message: 'SIGNATURE is missing' })
   SIGNATURE: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'TALENT_API_URL must be a string' })
+  @IsNotEmpty({ message: 'TALENT_API_URL is missing' })
   TALENT_API_URL: string;
+
+  @IsString({ message: 'BOT_ID must be a string' })
+  @IsNotEmpty({ message: 'BOT_ID is missing' })
+  BOT_ID: string;
+
+  @IsString({ message: 'BOT_USERNAME must be a string' })
+  @IsNotEmpty({ message: 'BOT_USERNAME is missing' })
+  BOT_USERNAME: string;
+
+  @IsString({ message: 'REDIS_HOST must be a string' })
+  @IsNotEmpty({ message: 'REDIS_HOST is missing' })
+  REDIS_HOST: string;
+
+  @IsNumber({}, { message: 'REDIS_PORT must be a number' })
+  @IsNotEmpty({ message: 'REDIS_PORT is missing' })
+  REDIS_PORT: number;
+
+  @IsOptional({ message: 'REDIS_PASSWORD is optional' })
+  REDIS_PASSWORD: string;
+
+  @IsNumber({}, { message: 'REDIS_DB must be a number' })
+  @IsNotEmpty({ message: 'REDIS_DB is missing' })
+  REDIS_DB: number;
 }
 
 export function validate(config: Record<string, unknown>) {
