@@ -116,7 +116,8 @@ BOT_ID=your_mezon_bot_id
 BOT_USERNAME=your_mezon_bot_username
 
 # Talent API (Example)
-TALENT_API_URL=your_talent_api_endpoint
+TALENT_API_URL_POST=''
+TALENT_API_URL_GET=''
 ```
 
 **Note**: Replace placeholder values with your actual configuration details.
@@ -155,7 +156,8 @@ BOT_ID=your_mezon_bot_id
 BOT_USERNAME=your_mezon_bot_username
 
 # Talent API (Ví dụ)
-TALENT_API_URL=your_talent_api_endpoint
+TALENT_API_URL_POST=''
+TALENT_API_URL_GET=''
 ```
 
 **Lưu ý**: Thay thế các giá trị giữ chỗ bằng chi tiết cấu hình thực tế của bạn.

@@ -15,11 +15,6 @@ import {
 import { CvFormRepository } from '../repositories/cv-form.repository';
 import { TalentApiService } from '../services/talent-api.service';
 import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
-import {
-  getCVSourceIdFromCVSourceValue,
-  getBranchIdFromBranchName,
-  getSubPositionIdFromSubPositionName,
-} from '../utils/helper';
 import { UserLimitSubmitRepository } from '../repositories/user-limit-submit.repository';
 import {
   CACHE_DURATION,
@@ -31,6 +26,7 @@ import {
 } from '../utils/helper';
 import { FormExpirationHandler } from '../utils/form-expiration-handler';
 import { CachingService } from 'src/common/services/caching.service';
+import { TalentApiData } from '../commands/asterisk/apply-cv/apply-cv.constant';
 
 @Injectable()
 export class MessageButtonClickListener {
@@ -348,14 +344,41 @@ export class MessageButtonClickListener {
       const cvExists = await this.cachingService.has(cvCacheKey);
       this.logger.log(`CV key ${cvCacheKey} exists: ${cvExists}`);
 
-      const avatarUrl: string = await this.cachingService.get(avatarCacheKey);
+      const avatarUrl: string = (await this.cachingService.get(
+        avatarCacheKey,
+      )) as string;
       this.logger.log('Avatar URL:', avatarUrl);
-
-      const confirmEmbed = BuildConfirmFormEmbed(formValues, avatarUrl);
+      let talentApiFormDataForConfirm: TalentApiData | null | undefined = null;
+      try {
+        const apiResponse = await this.talentApiService.getFormData();
+        this.logger.log(
+          'Full API response for confirmation embed:',
+          JSON.stringify(apiResponse),
+        );
+        if (apiResponse && apiResponse.result) {
+          talentApiFormDataForConfirm = apiResponse.result;
+        } else {
+          this.logger.warn(
+            'API response for confirmation embed did not contain .result or was null/undefined.',
+          );
+        }
+      } catch (fetchError) {
+        this.logger.error(
+          'Error fetching TalentApiData for confirmation embed:',
+          fetchError,
+        );
+      }
+      const confirmEmbed = BuildConfirmFormEmbed(
+        formValues,
+        avatarUrl,
+        talentApiFormDataForConfirm,
+      );
 
       await this.serverEditMessage(data, confirmEmbed);
 
-      const attachmentUrlFromCache = await this.cachingService.get(cvCacheKey);
+      const attachmentUrlFromCache: string = (await this.cachingService.get(
+        cvCacheKey,
+      )) as string;
 
       this.logger.log(
         'Avatar:',
@@ -386,24 +409,20 @@ export class MessageButtonClickListener {
 
   private submitCandidateToExternalSystem(
     cvForm: CvFormDto,
-    attachmentUrl: unknown,
+    attachmentUrl: string,
   ): void {
     const externalCvPayload = new ExternalCvPayloadDto();
     externalCvPayload.Name = cvForm.fullname;
     externalCvPayload.Email = cvForm.email;
     externalCvPayload.Phone = cvForm.phone;
-    externalCvPayload.SubPositionId = getSubPositionIdFromSubPositionName(
-      cvForm['position'],
-    );
-    externalCvPayload.BranchId = getBranchIdFromBranchName(cvForm.branch);
-    externalCvPayload.CVSourceId = getCVSourceIdFromCVSourceValue(
-      cvForm['cv-source'],
-    );
+    externalCvPayload.SubPositionId = parseInt(cvForm.position, 10);
+    externalCvPayload.BranchId = parseInt(cvForm.branch, 10);
+    externalCvPayload.CVSourceId = parseInt(cvForm['cv-source'], 10);
     externalCvPayload.Birthday = cvForm.dob || null;
     externalCvPayload.IsFemale = cvForm.gender === 'female';
     externalCvPayload.Address = cvForm.address || null;
     externalCvPayload.Note = cvForm.note || null;
-    externalCvPayload.LinkCV = attachmentUrl as string;
+    externalCvPayload.LinkCV = attachmentUrl;
 
     this.talentApiService.submitCandidateCV(externalCvPayload);
     this.logger.log('Payload:', externalCvPayload);

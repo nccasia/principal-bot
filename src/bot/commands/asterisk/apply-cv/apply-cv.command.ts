@@ -1,11 +1,12 @@
 import { ChannelMessage, MezonClient } from 'mezon-sdk';
-import { validAttachmentTypes } from './apply-cv.constant';
+import { TalentApiData, validAttachmentTypes } from './apply-cv.constant';
 import { CommandMessage } from 'src/bot/abstractions/commands/asterisk.abstract';
 import { MezonClientService } from 'src/mezon/services/client.service';
 import { Logger } from '@nestjs/common';
 import {
   BuildComponentsButton,
   BuildFormEmbed,
+  TalentCvFormDataNotFoundEmbed,
 } from 'src/bot/utils/embed-props';
 import { Command } from 'src/bot/decorators/command-storage.decorator';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
@@ -44,6 +45,34 @@ export class ApplyCVCommand extends CommandMessage {
       return this.replyWithError();
     }
 
+    let talentData;
+    try {
+      talentData = await this.mezonClient.getTalentCvFormData();
+      this.logger.log(
+        '[ApplyCVCommand] talentData received:',
+        JSON.stringify(talentData),
+      );
+      if (!talentData) {
+        this.logger.error(
+          `Failed to fetch talent CV form data for message ${messageId}. Proceeding without dynamic options or sending error.`,
+        );
+        return this.generateReplyMessage(
+          {
+            embed: TalentCvFormDataNotFoundEmbed,
+          },
+          message,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error fetching Talent CV Form Data', error);
+      return this.generateReplyMessage(
+        {
+          embed: TalentCvFormDataNotFoundEmbed,
+        },
+        message,
+      );
+    }
+
     await this.cacheUserData(messageId, userId, attachments[0]?.url, avatar);
     await this.trackUserSubmissionAttempt(userId);
     await this.logCacheData(messageId, userId);
@@ -58,7 +87,7 @@ export class ApplyCVCommand extends CommandMessage {
       `Started expiration timer for form ${messageId} for user ${userId}`,
     );
 
-    return this.generateResponseMessage(messageId, message);
+    return this.generateResponseMessage(messageId, message, talentData);
   }
 
   private isValidAttachment(filetype: string): boolean {
@@ -137,8 +166,12 @@ export class ApplyCVCommand extends CommandMessage {
     );
   }
 
-  private generateResponseMessage(messageId: string, message: ChannelMessage) {
-    const embed = BuildFormEmbed(messageId);
+  private generateResponseMessage(
+    messageId: string,
+    message: ChannelMessage,
+    talentApiFormData: TalentApiData,
+  ) {
+    const embed = BuildFormEmbed(messageId, talentApiFormData);
     const componentsButton = BuildComponentsButton(
       messageId,
       message.sender_id,

@@ -5,6 +5,7 @@ import { ConfigModule } from './config/config.module';
 import { AppConfigService } from './config/app-config.service';
 import { MezonModule } from './mezon/mezon.module';
 import { CommonModule } from './common/common.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CommonModule } from './common/common.module';
       imports: [ConfigModule],
     }),
     BotModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [],
   providers: [],

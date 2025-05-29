@@ -9,6 +9,8 @@ import { AppConfigService } from 'src/config/app-config.service';
 import { CACHE_DURATION } from 'src/bot/utils/helper';
 import { CachingService } from 'src/common/services/caching.service';
 import { MezonReplyMessage } from 'src/bot/dtos/reply-message.dto';
+import { TalentApiService } from 'src/bot/services/talent-api.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class MezonClientService {
@@ -17,6 +19,7 @@ export class MezonClientService {
   private readonly config: MezonClientConfig;
   private processedButtonEvents = new Map<string, number>();
   private channel_test: TextChannel;
+  private talentCvFormData: object;
 
   private static isInitialized = false;
 
@@ -25,6 +28,7 @@ export class MezonClientService {
     private readonly asterisk: Asterisk,
     private readonly eventEmitter: EventEmitter2,
     private readonly cachingService: CachingService,
+    private readonly talentApiService: TalentApiService,
   ) {
     this.logger.log(
       `MezonClientService constructor called, instance: ${Math.random().toString(36).substring(7)}`,
@@ -67,6 +71,8 @@ export class MezonClientService {
       this.setupReadyEventHandler();
       this.setupUserChannelAddedHandler();
       this.setupChannelMessageHandler();
+
+      await this.getTalentCvFormData();
 
       (this as any)._clientInitialized = true;
       MezonClientService.isInitialized = true;
@@ -420,6 +426,82 @@ export class MezonClientService {
       }
     } catch (error) {
       this.logger.error('Error in sendReply:', error);
+    }
+  }
+
+  async getTalentCvFormData(forceRefresh: boolean = false) {
+    const cacheKey = 'talentCvFormData';
+    if (!forceRefresh) {
+      const cachedData = await this.cachingService.get<object>(cacheKey);
+      if (cachedData) {
+        this.logger.log('Talent CV form data fetched successfully from cache.');
+        this.talentCvFormData = cachedData;
+        return cachedData;
+      }
+    }
+
+    this.logger.log(
+      forceRefresh
+        ? 'Force refreshing Talent CV form data from TalentAPI...'
+        : 'Cache miss. Fetching Talent CV form data from TalentAPI...',
+    );
+
+    if (!this.talentApiService) {
+      this.logger.error(
+        'TalentApiService is undefined in getTalentCvFormData before fetching!',
+      );
+      throw new Error(
+        'TalentApiService not available when trying to fetch form data.',
+      );
+    }
+
+    try {
+      const newData = await this.talentApiService.getFormData();
+      this.logger.log(
+        '[MezonClientService] Raw data from talentApiService.getFormData():',
+        JSON.stringify(newData),
+      );
+      if (newData && newData.result) {
+        const talentDataResult = newData.result;
+
+        this.logger.log(
+          'Talent CV form data (result object) fetched successfully from API.',
+          JSON.stringify(talentDataResult),
+        );
+
+        await this.cachingService.set(
+          cacheKey,
+          talentDataResult,
+          CACHE_DURATION.ONE_DAY_MS,
+        );
+        this.logger.log('Talent CV form data stored in cache.');
+        this.talentCvFormData = talentDataResult;
+        return talentDataResult;
+      } else {
+        this.logger.warn(
+          'Fetched null or undefined data from TalentApiService, not caching.',
+        );
+        return this.talentCvFormData;
+      }
+    } catch (error) {
+      this.logger.error('Error fetching data from TalentApiService', error);
+      return this.talentCvFormData;
+    }
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleCronRefreshTalentCvFormData() {
+    this.logger.log(
+      '[CRON JOB] Starting scheduled refresh of Talent CV Form Data...',
+    );
+    try {
+      await this.getTalentCvFormData(true);
+      this.logger.log('[CRON JOB] Talent CV Form Data refreshed successfully');
+    } catch (error) {
+      this.logger.error(
+        '[CRON JOB] Error refreshing Talent CV Form Data',
+        error,
+      );
     }
   }
 }

@@ -12,11 +12,11 @@ export class CvFormController {
 
   @Post('submit')
   async submitCvForm(@Body() sumissionDto: CvSubmissionDto) {
-    return this.cvFormService.submitCvForm(sumissionDto);
+    return await this.cvFormService.submitCvForm(sumissionDto);
   }
 
   @Get('form-data')
   async getFormData(): Promise<any> {
-    return this.talentApiService.getFormData();
+    return await this.talentApiService.getFormData();
   }
 }

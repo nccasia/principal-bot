@@ -7,6 +7,7 @@ import { AppConfigService } from 'src/config/app-config.service';
 import { ConfigModule } from 'src/config/config.module';
 import { CachingService } from 'src/common/services/caching.service';
 import { BotModule } from 'src/bot/bot.module';
+import { TalentApiService } from 'src/bot/services/talent-api.service';
 
 let clientServiceInstance: MezonClientService = null;
 let isModuleInitialized = false;
@@ -47,6 +48,7 @@ export class MezonModule {
             asterisk: Asterisk,
             eventEmitter: EventEmitter2,
             cachingService: CachingService,
+            talentApiService: TalentApiService,
           ) => {
             if (clientServiceInstance) {
               console.log('Reusing existing MezonClientService instance');
@@ -59,12 +61,19 @@ export class MezonModule {
               asterisk,
               eventEmitter,
               cachingService,
+              talentApiService,
             );
 
             await clientServiceInstance.initializeClient();
             return clientServiceInstance;
           },
-          inject: [AppConfigService, Asterisk, EventEmitter2, CachingService],
+          inject: [
+            AppConfigService,
+            Asterisk,
+            EventEmitter2,
+            CachingService,
+            TalentApiService,
+          ],
         },
       ],
       exports: [MezonClientService],

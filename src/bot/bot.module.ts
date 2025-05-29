@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { DiscoveryModule } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MulterModule } from '@nestjs/platform-express';
@@ -20,6 +19,7 @@ import { HttpModule } from '@nestjs/axios';
 import { UserEntity } from './entities/user.entity';
 import { UserLimitSubmitRepository } from './repositories/user-limit-submit.repository';
 import { FormExpirationHandler } from './utils/form-expiration-handler';
+import { ConfigModule } from 'src/config/config.module';
 
 @Module({
   imports: [
@@ -50,6 +50,6 @@ import { FormExpirationHandler } from './utils/form-expiration-handler';
     UserLimitSubmitRepository,
     FormExpirationHandler,
   ],
-  exports: [Asterisk, CvFormRepository],
+  exports: [Asterisk, CvFormRepository, TalentApiService],
 })
 export class BotModule {}
