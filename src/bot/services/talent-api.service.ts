@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
 import { HttpService } from '@nestjs/axios';

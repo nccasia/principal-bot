@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { ApiMessageRef, ChannelMessage } from 'mezon-sdk';
 import { MezonReplyMessage } from '../dtos/reply-message.dto';
 
