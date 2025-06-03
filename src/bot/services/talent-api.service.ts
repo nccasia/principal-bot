@@ -1,23 +1,34 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
 import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import crypto from 'crypto';
 import FormData from 'form-data';
+import { map } from 'rxjs/operators';
+import { lastValueFrom } from 'rxjs';
+import { MezonClientConfig } from 'src/mezon/dtos/mezon-client-config';
+import { AppConfigService } from 'src/config/app-config.service';
+import { talentApiUrl } from '../utils/helper';
 
 @Injectable()
 export class TalentApiService {
   private readonly logger = new Logger(TalentApiService.name);
+  private readonly config: MezonClientConfig;
   private readonly signature: string;
-  private readonly talentApiUrl: string;
+  private readonly talentBaseApiUrl: string;
+  private readonly talentGetFormDataUrl: string;
+  private readonly talentSubmitCandidateCVUrl: string;
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
+    private readonly configService: AppConfigService,
   ) {
-    this.signature = this.configService.get<string>('SIGNATURE');
-    this.talentApiUrl = this.configService.get<string>('TALENT_API_URL');
+    this.config = this.configService.mezonConfig;
+    this.signature = this.config.signature;
+    this.talentBaseApiUrl = this.config.talent_api_base_url;
+    this.talentGetFormDataUrl =
+      this.talentBaseApiUrl + talentApiUrl.getFormData;
+    this.talentSubmitCandidateCVUrl =
+      this.talentBaseApiUrl + talentApiUrl.submitCandidateCV;
   }
 
   private computeHash(input: string) {
@@ -80,7 +91,7 @@ export class TalentApiService {
     return this.computeHash(input);
   }
 
-  submitCandidateCV(candidateData: ExternalCvPayloadDto) {
+  async submitCandidateCV(candidateData: ExternalCvPayloadDto) {
     try {
       const formData = new FormData();
 
@@ -109,19 +120,24 @@ export class TalentApiService {
         'X-Hash': hash,
       };
 
-      const response = this.httpService.post(this.talentApiUrl, formData, {
-        headers,
-      });
+      const response = this.httpService.post(
+        this.talentSubmitCandidateCVUrl,
+        formData,
+        {
+          headers,
+        },
+      );
 
-      console.log('Success! CV submitted with ID:', response);
-      return response;
+      const data = await lastValueFrom(response.pipe(map((resp) => resp.data)));
+      console.log('Success! CV submitted with data:', data);
+      return data;
     } catch (error) {
       console.error('Error submitting CV:', error);
       throw error;
     }
   }
 
-  getFormData(params = {}) {
+  async getFormData(params = {}) {
     try {
       const hash = this.computeHashForGet(params, this.signature);
       console.log('Generated hash:', hash);
@@ -130,15 +146,16 @@ export class TalentApiService {
         'X-Hash': hash,
       };
 
-      console.log('Sending request to:', this.talentApiUrl);
+      console.log('Sending request to:', this.talentGetFormDataUrl);
 
-      const response = this.httpService.get(this.talentApiUrl, {
+      const response = this.httpService.get(this.talentGetFormDataUrl, {
         params: params,
         headers: headers,
       });
 
+      const data = await lastValueFrom(response.pipe(map((resp) => resp.data)));
       console.log('Request successful!');
-      return response;
+      return data;
     } catch (error) {
       console.error('Error fetching form data:', error);
       throw error;

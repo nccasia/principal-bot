@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { MezonClientConfig } from '../dtos/mezon-client-config';
 import { ChannelMessage, MezonClient } from 'mezon-sdk';
@@ -11,6 +6,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TextChannel } from 'mezon-sdk/dist/cjs/mezon-client/structures/TextChannel';
 import { validAttachmentTypes } from 'src/bot/commands/asterisk/apply-cv/apply-cv.constant';
 import { AppConfigService } from 'src/config/app-config.service';
+import { CACHE_DURATION } from 'src/bot/utils/helper';
+import { CachingService } from 'src/common/services/caching.service';
+import { MezonReplyMessage } from 'src/bot/dtos/reply-message.dto';
+import { TalentApiService } from 'src/bot/services/talent-api.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class MezonClientService {
@@ -19,14 +19,16 @@ export class MezonClientService {
   private readonly config: MezonClientConfig;
   private processedButtonEvents = new Map<string, number>();
   private channel_test: TextChannel;
+  private talentCvFormData: object;
 
-  // Static property to ensure we only initialize once across all instances
   private static isInitialized = false;
 
   constructor(
     private appConfigService: AppConfigService,
     private readonly asterisk: Asterisk,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cachingService: CachingService,
+    private readonly talentApiService: TalentApiService,
   ) {
     this.logger.log(
       `MezonClientService constructor called, instance: ${Math.random().toString(36).substring(7)}`,
@@ -46,7 +48,6 @@ export class MezonClientService {
   }
 
   async initializeClient() {
-    // Prevent duplicate initialization using static property
     if (MezonClientService.isInitialized) {
       this.logger.warn(
         'Mezon client already globally initialized, skipping duplicate initialization',
@@ -54,7 +55,6 @@ export class MezonClientService {
       return true;
     }
 
-    // Prevent duplicate initialization using instance property
     if ((this as any)._clientInitialized) {
       this.logger.warn(
         'Mezon client already initialized for this instance, skipping duplicate initialization',
@@ -72,7 +72,8 @@ export class MezonClientService {
       this.setupUserChannelAddedHandler();
       this.setupChannelMessageHandler();
 
-      // Mark as initialized on both instance and class level
+      await this.getTalentCvFormData();
+
       (this as any)._clientInitialized = true;
       MezonClientService.isInitialized = true;
       this.logger.log('Mezon client fully initialized');
@@ -85,7 +86,6 @@ export class MezonClientService {
   }
 
   private setupButtonEventHandlers() {
-    // Check if event handler is already registered to prevent duplicates
     if ((this.client as any)._buttonEventHandlerRegistered) {
       this.logger.warn(
         'Button event handler already registered, skipping duplicate registration',
@@ -94,28 +94,17 @@ export class MezonClientService {
     }
 
     this.client.on('message_button_clicked', (data) => {
-      const eventId = this.createButtonEventId(data);
       const now = Date.now();
 
-      if (this.isButtonEventDuplicate(eventId, now)) {
-        return;
-      }
-
-      this.recordButtonEvent(eventId, now);
-      this.cleanupButtonEvents(now);
-
-      // Add timestamp to the event data to help with deduplication downstream
       const enrichedData = {
         ...data,
         _timestamp: now,
-        _eventId: eventId,
-      };
+      } as unknown as object;
 
       this.logger.log('Button clicked:', enrichedData);
       this.eventEmitter.emit('message_button_clicked', enrichedData);
     });
 
-    // Mark handler as registered
     (this.client as any)._buttonEventHandlerRegistered = true;
     this.logger.log('Button event handler registered successfully');
   }
@@ -151,7 +140,6 @@ export class MezonClientService {
   }
 
   private setupReadyEventHandler() {
-    // Check if event handler is already registered to prevent duplicates
     if ((this.client as any)._readyEventHandlerRegistered) {
       this.logger.warn(
         'Ready event handler already registered, skipping duplicate registration',
@@ -186,11 +174,11 @@ export class MezonClientService {
       return;
     }
 
-    this.client.onUserChannelAdded((event) => {
+    this.client.onUserChannelAdded(async (event) => {
       const user = event.users[0];
       const channelName = event.channel_desc.clan_name;
 
-      this.channel_test.send({
+      await this.channel_test.send({
         t: `Xin chào ${user.username}! Chào mừng bạn đến với kênh ${channelName}. Hãy sử dụng lệnh *guicv và đính kèm 01 file (.docx hoặc .pdf) để gửi CV của bạn.`,
       });
     });
@@ -207,29 +195,12 @@ export class MezonClientService {
       return;
     }
 
-    const processedMessages = new Map<string, number>();
-
     this.client.onChannelMessage(async (message: ChannelMessage) => {
-      const messageId = message.message_id;
-      const now = Date.now();
-
-      if (processedMessages.has(messageId)) {
-        const lastProcessed = processedMessages.get(messageId);
-        if (now - lastProcessed < 5000) {
-          this.logger.log(`Skipping duplicate message: ${messageId}`);
-          return;
-        }
-      }
-
-      processedMessages.set(messageId, now);
-
-      if (processedMessages.size > 100) {
-        const fiveMinutesAgo = now - 300000;
-        for (const [key, timestamp] of processedMessages.entries()) {
-          if (timestamp < fiveMinutesAgo) {
-            processedMessages.delete(key);
-          }
-        }
+      const avoidProcessingBotMessage =
+        message.sender_id === this.config.bot_id ||
+        message.username === this.config.bot_username;
+      if (avoidProcessingBotMessage) {
+        return;
       }
 
       if (!this.isMessageFromAllowedChannel(message)) {
@@ -375,12 +346,15 @@ export class MezonClientService {
     channelRep: Promise<TextChannel>,
   ) {
     try {
-      const result = this.asterisk.execute(message.content.t, message);
+      const result = (await this.asterisk.execute(
+        message.content.t,
+        message,
+      )) as MezonReplyMessage;
       this.logger.log(`Command result: ${JSON.stringify(result)}`);
 
       if (result && result.msg) {
         try {
-          await this.sendReply(channelRep, result.msg, message);
+          await this.sendReply(channelRep, result.msg as object, message);
           this.logger.log('Reply message sent successfully');
         } catch (sendError) {
           this.logger.error('Error sending reply:', sendError);
@@ -437,9 +411,97 @@ export class MezonClientService {
     try {
       const channel = await channelRep;
       const messageObj = await channel.messages.fetch(message.message_id);
-      await messageObj.reply(content);
+      const responseMessage = await messageObj.reply(content);
+
+      if (responseMessage && responseMessage.message_id) {
+        const cacheKey = `response-message-${message.id}-${message.sender_id}`;
+        await this.cachingService.set(
+          cacheKey,
+          responseMessage.message_id,
+          CACHE_DURATION.FIVE_MINUTES_MS,
+        );
+        this.logger.log(
+          `Cached response message ID: ${responseMessage.message_id} for command ${message.id}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Error in sendReply:', error);
+    }
+  }
+
+  async getTalentCvFormData(forceRefresh: boolean = false) {
+    const cacheKey = 'talentCvFormData';
+    if (!forceRefresh) {
+      const cachedData = await this.cachingService.get<object>(cacheKey);
+      if (cachedData) {
+        this.logger.log('Talent CV form data fetched successfully from cache.');
+        this.talentCvFormData = cachedData;
+        return cachedData;
+      }
+    }
+
+    this.logger.log(
+      forceRefresh
+        ? 'Force refreshing Talent CV form data from TalentAPI...'
+        : 'Cache miss. Fetching Talent CV form data from TalentAPI...',
+    );
+
+    if (!this.talentApiService) {
+      this.logger.error(
+        'TalentApiService is undefined in getTalentCvFormData before fetching!',
+      );
+      throw new Error(
+        'TalentApiService not available when trying to fetch form data.',
+      );
+    }
+
+    try {
+      const newData = await this.talentApiService.getFormData();
+      this.logger.log(
+        '[MezonClientService] Raw data from talentApiService.getFormData():',
+        JSON.stringify(newData),
+      );
+      if (newData && newData.result) {
+        const talentDataResult = newData.result;
+
+        this.logger.log(
+          'Talent CV form data (result object) fetched successfully from API.',
+          JSON.stringify(talentDataResult),
+        );
+
+        await this.cachingService.set(
+          cacheKey,
+          talentDataResult,
+          CACHE_DURATION.ONE_DAY_MS,
+        );
+        this.logger.log('Talent CV form data stored in cache.');
+        this.talentCvFormData = talentDataResult;
+        return talentDataResult;
+      } else {
+        this.logger.warn(
+          'Fetched null or undefined data from TalentApiService, not caching.',
+        );
+        return this.talentCvFormData;
+      }
+    } catch (error) {
+      this.logger.error('Error fetching data from TalentApiService', error);
+      return this.talentCvFormData;
+    }
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleCronRefreshTalentCvFormData() {
+    this.logger.log(
+      '[CRON JOB] Starting scheduled refresh of Talent CV Form Data...',
+    );
+    try {
+      await this.getTalentCvFormData(true);
+      this.logger.log('[CRON JOB] Talent CV Form Data refreshed successfully');
+    } catch (error) {
+      this.logger.error(
+        '[CRON JOB] Error refreshing Talent CV Form Data',
+        error,
+      );
     }
   }
 }

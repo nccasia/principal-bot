@@ -26,75 +26,6 @@ export const COLORS: Readonly<Record<string, string>> = Object.freeze({
   Yellow: '#FFFF00',
 });
 
-export function getBranchIdFromBranchName(
-  branchName: string,
-): number | undefined {
-  switch (branchName) {
-    case 'hn1':
-      return 1;
-    case 'hn2':
-      return 2;
-    case 'hn3':
-      return 3;
-    case 'vinh':
-      return 4;
-    case 'saigon':
-      return 5;
-    case 'quynhon':
-      return 6;
-    case 'danang':
-      return 7;
-    default:
-      throw new Error(`Unknown branch: ${branchName}`);
-  }
-}
-
-export function getSubPositionIdFromSubPositionName(
-  subPositionValue: string,
-): number | undefined {
-  switch (subPositionValue) {
-    case 'nodejs':
-      return 1;
-    case 'reactjs':
-      return 2;
-    case 'fullstack':
-      return 3;
-    case 'qa':
-      return 4;
-    case 'devops':
-      return 5;
-    case 'uiux':
-      return 6;
-    case 'pm':
-      return 7;
-    case 'internship':
-      return 8;
-    default:
-      throw new Error(`Unknown sub-position value: ${subPositionValue}`);
-  }
-}
-
-export function getCVSourceIdFromCVSourceValue(
-  cvSourceValue: string,
-): number | undefined {
-  switch (cvSourceValue) {
-    case 'linkedin':
-      return 1;
-    case 'facebook':
-      return 2;
-    case 'zalo':
-      return 3;
-    case 'referral':
-      return 4;
-    case 'topcv':
-      return 5;
-    case 'other':
-      return 6;
-    default:
-      throw new Error(`Unknown CV source value: ${cvSourceValue}`);
-  }
-}
-
 export interface ButtonClickEventData {
   message_id: string;
   button_id: string;
@@ -108,6 +39,7 @@ export const CACHE_DURATION = {
   FIVE_MINUTES_SECONDS: 300,
   TWO_SECONDS_MS: 2000,
   ONE_DAY_SECONDS: 86400,
+  ONE_DAY_MS: 86400000,
 };
 
 export const SUBMISSION_LIMITS = {
@@ -137,3 +69,77 @@ export const FORM_FIELD_KEYS = [
   'address',
   'note',
 ];
+
+export const findLabelById = (
+  id: string | number | undefined,
+  optionsList:
+    | Array<{
+        id?: number;
+        name?: string;
+        displayName?: string;
+        label?: string;
+        value?: string;
+      }>
+    | undefined,
+  config: { idField: 'id'; displayField: 'name' | 'displayName' | 'label' },
+): string => {
+  if (id === undefined || !optionsList || optionsList.length === 0) {
+    return id?.toString() || 'N/A';
+  }
+  const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+  if (isNaN(numericId)) {
+    return id.toString();
+  }
+
+  const foundOption = optionsList.find(
+    (option) => option[config.idField] === numericId,
+  );
+
+  return foundOption
+    ? foundOption[config.displayField] ||
+        foundOption.name ||
+        foundOption.label ||
+        numericId.toString()
+    : numericId.toString();
+};
+
+export const mapToSelectOptions = (
+  items:
+    | Array<{
+        id?: number;
+        name?: string;
+        displayName?: string;
+        label?: string;
+        value?: string;
+      }>
+    | undefined,
+  config: {
+    nameField: 'name' | 'displayName' | 'label';
+    valueField: 'id' | 'value';
+  },
+): Array<{ label: string; value: string }> => {
+  if (!items || items.length === 0) {
+    return [{ label: 'Không có lựa chọn', value: 'NO_OPTION_FALLBACK' }];
+  }
+  return items.map((item) => {
+    const label = item[config.nameField] || item.name || item.label || 'N/A';
+    const value =
+      item[config.valueField]?.toString() ||
+      item.value?.toString() ||
+      'NO_VALUE_FALLBACK';
+    return { label, value };
+  });
+};
+
+export const getSelectedValue = (
+  options: Array<{ label: string; value: string }>,
+): { label: string; value: string } => {
+  return (
+    options[0] || { label: 'Không có lựa chọn', value: 'NO_OPTION_FALLBACK' }
+  );
+};
+
+export const talentApiUrl = {
+  getFormData: 'api/services/app/Public/GetMezonCVFormData',
+  submitCandidateCV: 'api/services/app/Public/CreateMezonInternCV',
+};

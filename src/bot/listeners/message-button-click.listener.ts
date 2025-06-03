@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { MezonClient } from 'mezon-sdk';
@@ -16,15 +12,9 @@ import {
   LimitSubmitCVEmbed,
   ValidationErrorEmbed,
 } from '../utils/embed-props';
-import cache from '../utils/shared-cache';
 import { CvFormRepository } from '../repositories/cv-form.repository';
 import { TalentApiService } from '../services/talent-api.service';
 import { ExternalCvPayloadDto } from '../dtos/external-cv-payload.dto';
-import {
-  getCVSourceIdFromCVSourceValue,
-  getBranchIdFromBranchName,
-  getSubPositionIdFromSubPositionName,
-} from '../utils/helper';
 import { UserLimitSubmitRepository } from '../repositories/user-limit-submit.repository';
 import {
   CACHE_DURATION,
@@ -34,6 +24,9 @@ import {
   FORM_FIELD_KEYS,
   ButtonClickEventData,
 } from '../utils/helper';
+import { FormExpirationHandler } from '../utils/form-expiration-handler';
+import { CachingService } from 'src/common/services/caching.service';
+import { TalentApiData } from '../commands/asterisk/apply-cv/apply-cv.constant';
 
 @Injectable()
 export class MessageButtonClickListener {
@@ -48,8 +41,13 @@ export class MessageButtonClickListener {
     private readonly cvRepository: CvFormRepository,
     private readonly talentApiService: TalentApiService,
     private readonly userLimitSubmitRepository: UserLimitSubmitRepository,
+    private readonly cachingService: CachingService,
+    private readonly formExpirationHandler: FormExpirationHandler,
   ) {
     this.client = clientService.getClient();
+    this.logger.log(
+      `MessageButtonClickListener using CachingService instance: ${this.cachingService.instanceId}`,
+    );
   }
 
   @OnEvent('message_button_clicked')
@@ -66,15 +64,26 @@ export class MessageButtonClickListener {
       this.processedEvents.set(eventId, now);
       this.logger.log('Xử lý sự kiện button click:', data.button_id);
 
-      const { formType, messageId, action } = this.parseButtonId(
-        data.button_id,
-      );
-      if (!formType || !messageId || !action) {
+      const { formType, originalCommandMessageId, originalSenderId, action } =
+        this.parseButtonId(data.button_id);
+      if (
+        !formType ||
+        !originalCommandMessageId ||
+        !originalSenderId ||
+        !action
+      ) {
+        return;
+      }
+
+      if (data.user_id !== originalSenderId) {
+        this.logger.warn(
+          `Invalid user clicked button. Clicker: ${data.user_id}, Expected: ${originalSenderId}. ButtonID: ${data.button_id}`,
+        );
         return;
       }
 
       if (formType === FORM_TYPES.CV) {
-        await this.handleCVFormAction(data, messageId, action);
+        await this.handleCVFormAction(data, originalCommandMessageId, action);
       }
     } catch (error) {
       this.logger.error('Lỗi xử lý sự kiện click button:', error);
@@ -109,31 +118,41 @@ export class MessageButtonClickListener {
 
   private parseButtonId(buttonId: string): {
     formType: string;
-    messageId: string;
+    originalCommandMessageId: string;
+    originalSenderId: string;
     action: string;
   } {
-    const splitButtonId = buttonId.split('_');
-    if (splitButtonId.length !== 3) {
-      this.logger.warn('Định dạng button ID không hợp lệ:', buttonId);
-      return { formType: null, messageId: null, action: null };
+    const parts = buttonId.split('-');
+    if (parts.length !== 3 && parts.length !== 4) {
+      this.logger.warn(
+        `Button ID format invalid (expected 3 or 4 parts, got ${parts.length}):`,
+        buttonId,
+      );
+      return {
+        formType: null,
+        originalCommandMessageId: null,
+        originalSenderId: null,
+        action: null,
+      };
     }
 
     return {
-      formType: splitButtonId[0],
-      messageId: splitButtonId[1],
-      action: splitButtonId[2],
+      formType: parts[0],
+      originalCommandMessageId: parts[1],
+      originalSenderId: parts[2],
+      action: parts[3],
     };
   }
 
   private async handleCVFormAction(
     data: ButtonClickEventData,
-    messageId: string,
+    originalCommandMessageId: string,
     action: string,
   ): Promise<void> {
     if (action === ACTIONS.SUBMIT) {
-      await this.handleSubmitCV(data, messageId);
+      await this.handleSubmitCV(data, originalCommandMessageId);
     } else if (action === ACTIONS.CANCEL) {
-      await this.handleCancelCV(data, messageId);
+      await this.handleCancelCV(data, originalCommandMessageId);
     }
   }
 
@@ -187,14 +206,10 @@ export class MessageButtonClickListener {
 
   private async handleSubmitCV(
     data: ButtonClickEventData,
-    messageId: string,
+    originalCommandMessageId: string,
   ): Promise<void> {
     try {
-      if (!this.isValidUserForAction(data.user_id, messageId)) {
-        return;
-      }
-
-      const formSubmissionId = `form_${messageId}_${data.user_id}`;
+      const formSubmissionId = `form_${originalCommandMessageId}_${data.user_id}`;
       if (this.checkAndRegisterFormAction(formSubmissionId)) {
         return;
       }
@@ -214,33 +229,25 @@ export class MessageButtonClickListener {
         return;
       }
 
-      await this.processValidCVSubmission(data, messageId, cvForm, formValues);
+      await this.processValidCVSubmission(
+        data,
+        originalCommandMessageId,
+        cvForm,
+        formValues,
+      );
     } catch (error) {
       this.logger.error('Lỗi trong handleSubmitCV:', error);
     }
-  }
-
-  private isValidUserForAction(userId: string, messageId: string): boolean {
-    const validUserToClickButton = cache.get(
-      `valid-user-to-click-button-${messageId}-${userId}`,
-    );
-
-    if (!validUserToClickButton) {
-      this.logger.warn('User không hợp lệ đã click button Submit CV');
-      return false;
-    }
-
-    return true;
   }
 
   private parseFormValues(data: ButtonClickEventData): Record<string, any> {
     const extraData = JSON.parse(data.extra_data);
     const formValues = {};
 
-    const { messageId } = this.parseButtonId(data.button_id);
+    const { originalCommandMessageId } = this.parseButtonId(data.button_id);
 
     for (const key of FORM_FIELD_KEYS) {
-      const fieldKey = `applycv-${messageId}-${key}`;
+      const fieldKey = `applycv-${originalCommandMessageId}-${key}`;
       formValues[key] = Array.isArray(extraData[fieldKey])
         ? extraData[fieldKey][0]
         : extraData[fieldKey];
@@ -290,7 +297,9 @@ export class MessageButtonClickListener {
     data: ButtonClickEventData,
   ): Promise<boolean> {
     const cacheKeySubmitCV = `attempt-submit-cv-${userId}`;
-    let currentAttemptCount = cache.get(cacheKeySubmitCV) as number | undefined;
+    let currentAttemptCount = (await this.cachingService.get(
+      cacheKeySubmitCV,
+    )) as number | undefined;
 
     if (currentAttemptCount === undefined) {
       currentAttemptCount = 0;
@@ -319,23 +328,62 @@ export class MessageButtonClickListener {
 
   private async processValidCVSubmission(
     data: ButtonClickEventData,
-    messageId: string,
+    originalCommandMessageId: string,
     cvForm: CvFormDto,
     formValues: Record<string, any>,
   ): Promise<void> {
     try {
-      const avatarUrl: string = cache.get(
-        `avatar-${messageId}-${data.user_id}`,
+      const avatarCacheKey = `avatar-${originalCommandMessageId}-${data.user_id}`;
+      const cvCacheKey = `cv-attachment-${originalCommandMessageId}-${data.user_id}`;
+
+      this.logger.log(`Checking existence for avatar key: ${avatarCacheKey}`);
+      const avatarExists = await this.cachingService.has(avatarCacheKey);
+      this.logger.log(`Avatar key ${avatarCacheKey} exists: ${avatarExists}`);
+
+      this.logger.log(`Checking existence for CV key: ${cvCacheKey}`);
+      const cvExists = await this.cachingService.has(cvCacheKey);
+      this.logger.log(`CV key ${cvCacheKey} exists: ${cvExists}`);
+
+      const avatarUrl: string = (await this.cachingService.get(
+        avatarCacheKey,
+      )) as string;
+      this.logger.log('Avatar URL:', avatarUrl);
+      let talentApiFormDataForConfirm: TalentApiData | null | undefined = null;
+      try {
+        const apiResponse = await this.talentApiService.getFormData();
+        this.logger.log(
+          'Full API response for confirmation embed:',
+          JSON.stringify(apiResponse),
+        );
+        if (apiResponse && apiResponse.result) {
+          talentApiFormDataForConfirm = apiResponse.result;
+        } else {
+          this.logger.warn(
+            'API response for confirmation embed did not contain .result or was null/undefined.',
+          );
+        }
+      } catch (fetchError) {
+        this.logger.error(
+          'Error fetching TalentApiData for confirmation embed:',
+          fetchError,
+        );
+      }
+      const confirmEmbed = BuildConfirmFormEmbed(
+        formValues,
+        avatarUrl,
+        talentApiFormDataForConfirm,
       );
-      const confirmEmbed = BuildConfirmFormEmbed(formValues, avatarUrl);
 
       await this.serverEditMessage(data, confirmEmbed);
 
-      const attachmentUrlFromCache = cache.get(
-        `cv-attachment-${messageId}-${data.user_id}`,
-      );
+      const attachmentUrlFromCache: string = (await this.cachingService.get(
+        cvCacheKey,
+      )) as string;
 
-      this.logger.log('Avatar:', `avatar-${messageId}-${data.user_id}`);
+      this.logger.log(
+        'Avatar:',
+        `avatar-${originalCommandMessageId}-${data.user_id}`,
+      );
       if (attachmentUrlFromCache) {
         this.logger.log('Đã tìm thấy URL CV:', attachmentUrlFromCache);
       } else {
@@ -344,59 +392,73 @@ export class MessageButtonClickListener {
 
       this.submitCandidateToExternalSystem(cvForm, attachmentUrlFromCache);
 
-      this.cleanupAfterSuccessfulSubmission(data.user_id, messageId);
+      await this.cleanupAfterSuccessfulSubmission(
+        data.user_id,
+        originalCommandMessageId,
+      );
       await this.updateSubmissionCounters(data.user_id);
 
       this.logger.log('Đã gửi xác nhận nộp CV thành công');
       this.logger.log('Thông tin form:', formValues);
     } catch (sendError) {
       this.logger.error('Lỗi khi gửi tin nhắn xác nhận CV:', sendError);
-      const formSubmissionId = `form_${messageId}_${data.user_id}`;
+      const formSubmissionId = `form_${originalCommandMessageId}_${data.user_id}`;
       MessageButtonClickListener.processedSubmissions.delete(formSubmissionId);
     }
   }
 
   private submitCandidateToExternalSystem(
     cvForm: CvFormDto,
-    attachmentUrl: unknown,
+    attachmentUrl: string,
   ): void {
     const externalCvPayload = new ExternalCvPayloadDto();
     externalCvPayload.Name = cvForm.fullname;
     externalCvPayload.Email = cvForm.email;
     externalCvPayload.Phone = cvForm.phone;
-    externalCvPayload.SubPositionId = getSubPositionIdFromSubPositionName(
-      cvForm['position'],
-    );
-    externalCvPayload.BranchId = getBranchIdFromBranchName(cvForm.branch);
-    externalCvPayload.CVSourceId = getCVSourceIdFromCVSourceValue(
-      cvForm['cv-source'],
-    );
+    externalCvPayload.SubPositionId = parseInt(cvForm.position, 10);
+    externalCvPayload.BranchId = parseInt(cvForm.branch, 10);
+    externalCvPayload.CVSourceId = parseInt(cvForm['cv-source'], 10);
     externalCvPayload.Birthday = cvForm.dob || null;
     externalCvPayload.IsFemale = cvForm.gender === 'female';
     externalCvPayload.Address = cvForm.address || null;
     externalCvPayload.Note = cvForm.note || null;
-    externalCvPayload.LinkCV = attachmentUrl as string;
+    externalCvPayload.LinkCV = attachmentUrl;
 
     this.talentApiService.submitCandidateCV(externalCvPayload);
     this.logger.log('Payload:', externalCvPayload);
   }
 
-  private cleanupAfterSuccessfulSubmission(
+  private async cleanupAfterSuccessfulSubmission(
     userId: string,
-    messageId: string,
-  ): void {
-    cache.del(`valid-user-to-click-button-${messageId}-${userId}`);
+    originalCommandMessageId: string,
+  ): Promise<void> {
+    await this.cachingService.del(
+      `cv-attachment-${originalCommandMessageId}-${userId}`,
+    );
+    await this.cachingService.del(
+      `avatar-${originalCommandMessageId}-${userId}`,
+    );
+    await this.cachingService.del(
+      `response-message-${originalCommandMessageId}-${userId}`,
+    );
+
+    await this.formExpirationHandler.clearFormTimer(
+      originalCommandMessageId,
+      userId,
+    );
   }
 
   private async updateSubmissionCounters(userId: string): Promise<void> {
     const cacheKeySubmitCV = `attempt-submit-cv-${userId}`;
-    let currentAttemptCount = cache.get(cacheKeySubmitCV) as number | undefined;
+    let currentAttemptCount = (await this.cachingService.get(
+      cacheKeySubmitCV,
+    )) as number | undefined;
     if (currentAttemptCount === undefined) {
       currentAttemptCount = 0;
     }
 
     const newAttemptCount = currentAttemptCount + 1;
-    cache.set(cacheKeySubmitCV, newAttemptCount);
+    await this.cachingService.set(cacheKeySubmitCV, newAttemptCount);
     this.logger.log(
       `User ${userId} CV submitted. Attempt count updated to: ${newAttemptCount}`,
     );
@@ -406,14 +468,10 @@ export class MessageButtonClickListener {
 
   private async handleCancelCV(
     data: ButtonClickEventData,
-    messageId: string,
+    originalCommandMessageId: string,
   ): Promise<void> {
     try {
-      if (!this.isValidUserForAction(data.user_id, messageId)) {
-        return;
-      }
-
-      const cancelActionId = `cancel_${messageId}_${data.user_id}`;
+      const cancelActionId = `cancel_${originalCommandMessageId}_${data.user_id}`;
       if (this.checkAndRegisterFormAction(cancelActionId)) {
         return;
       }
@@ -421,10 +479,17 @@ export class MessageButtonClickListener {
       await this.serverEditMessage(data, CancelFormEmbed);
       this.logger.log('Đã gửi thông báo hủy form CV');
 
-      cache.del(`valid-user-to-click-button-${messageId}-${data.user_id}`);
+      await this.cachingService.del(
+        `response-message-${originalCommandMessageId}-${data.user_id}`,
+      );
+
+      await this.formExpirationHandler.clearFormTimer(
+        originalCommandMessageId,
+        data.user_id,
+      );
     } catch (error) {
       this.logger.error('Lỗi trong handleCancelCV:', error);
-      const cancelActionId = `cancel_${messageId}_${data.user_id}`;
+      const cancelActionId = `cancel_${originalCommandMessageId}_${data.user_id}`;
       MessageButtonClickListener.processedSubmissions.delete(cancelActionId);
     }
   }

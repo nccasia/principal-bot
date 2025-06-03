@@ -1,11 +1,13 @@
-import { DynamicModule, Global, Module, forwardRef } from '@nestjs/common';
+import { DynamicModule, Global, Module } from '@nestjs/common';
 import { MezonModuleAsyncOptions } from './dtos/mezon-module-async-options';
 import { MezonClientService } from './services/client.service';
 import { Asterisk } from 'src/bot/commands/asterisk/asterisk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppConfigService } from 'src/config/app-config.service';
 import { ConfigModule } from 'src/config/config.module';
+import { CachingService } from 'src/common/services/caching.service';
 import { BotModule } from 'src/bot/bot.module';
+import { TalentApiService } from 'src/bot/services/talent-api.service';
 
 let clientServiceInstance: MezonClientService = null;
 let isModuleInitialized = false;
@@ -37,7 +39,7 @@ export class MezonModule {
 
     return {
       module: MezonModule,
-      imports: [...options.imports, forwardRef(() => BotModule), ConfigModule],
+      imports: [...options.imports, BotModule, ConfigModule],
       providers: [
         {
           provide: MezonClientService,
@@ -45,6 +47,8 @@ export class MezonModule {
             appConfigService: AppConfigService,
             asterisk: Asterisk,
             eventEmitter: EventEmitter2,
+            cachingService: CachingService,
+            talentApiService: TalentApiService,
           ) => {
             if (clientServiceInstance) {
               console.log('Reusing existing MezonClientService instance');
@@ -56,12 +60,20 @@ export class MezonModule {
               appConfigService,
               asterisk,
               eventEmitter,
+              cachingService,
+              talentApiService,
             );
 
             await clientServiceInstance.initializeClient();
             return clientServiceInstance;
           },
-          inject: [AppConfigService, Asterisk, EventEmitter2],
+          inject: [
+            AppConfigService,
+            Asterisk,
+            EventEmitter2,
+            CachingService,
+            TalentApiService,
+          ],
         },
       ],
       exports: [MezonClientService],

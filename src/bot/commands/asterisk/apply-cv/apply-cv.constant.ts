@@ -6,36 +6,6 @@ export const candidateTypesOptions = [
   { label: 'Senior', value: 'senior' },
 ];
 
-export const positionOptions = [
-  { label: 'NodeJs Developer', value: 'nodejs' },
-  { label: 'ReactJs Developer', value: 'reactjs' },
-  { label: 'FullStack Developer', value: 'fullstack' },
-  { label: 'QA Engineer', value: 'qa' },
-  { label: 'DevOps Engineer', value: 'devops' },
-  { label: 'UI/UX Designer', value: 'uiux' },
-  { label: 'Project Manager', value: 'pm' },
-];
-
-export const branchOptions = [
-  { label: 'Hà Nội 1', value: 'hn1' },
-  { label: 'Hà Nội 2', value: 'hn2' },
-  { label: 'Hà Nội 3', value: 'hn3' },
-  { label: 'Vinh', value: 'vinh' },
-  { label: 'Đà Nẵng', value: 'danang' },
-  { label: 'Hồ Chí Minh', value: 'saigon' },
-  { label: 'Quy Nhơn', value: 'quynhon' },
-];
-
-// CV Source options
-export const cvSourceOptions = [
-  { label: 'LinkedIn', value: 'linkedin' },
-  { label: 'Facebook', value: 'facebook' },
-  { label: 'Zalo', value: 'zalo' },
-  { label: 'Referral', value: 'referral' },
-  { label: 'TopCV', value: 'topcv' },
-  { label: 'Other', value: 'other' },
-];
-
 export const genderOptions = [
   { label: 'Nam', value: 'male' },
   { label: 'Nữ', value: 'female' },
@@ -48,3 +18,32 @@ export const validAttachmentTypes = [
   'docx',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
+
+interface ApiBranchOption {
+  id: number;
+  displayName: string;
+  name: string;
+}
+
+interface ApiSubPositionOption {
+  id: number;
+  name: string;
+}
+
+interface ApiCvSourceOption {
+  id: number;
+  name: string;
+}
+
+interface ApiGeneralOption {
+  id: number;
+  name: string;
+}
+
+export interface TalentApiData {
+  branches: ApiBranchOption[];
+  subPositions: ApiSubPositionOption[];
+  cvSources: ApiCvSourceOption[];
+  candidateTypes?: ApiGeneralOption[];
+  genders?: ApiGeneralOption[];
+}
