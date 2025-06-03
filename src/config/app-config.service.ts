@@ -44,8 +44,9 @@ export class AppConfigService {
       channel_main_id: this.getString('CHANNEL_MAIN_ID'),
       channel_test_id: this.getString('CHANNEL_TEST_ID'),
       signature: this.getString('SIGNATURE'),
-      talent_api_url_get: this.getString('TALENT_API_URL_GET'),
-      talent_api_url_post: this.getString('TALENT_API_URL_POST'),
+      // talent_api_url_get: this.getString('TALENT_API_URL_GET'),
+      // talent_api_url_post: this.getString('TALENT_API_URL_POST'),
+      talent_api_base_url: this.getString('TALENT_API_BASE_URL'),
       bot_id: this.getString('BOT_ID'),
       bot_username: this.getString('BOT_USERNAME'),
     };

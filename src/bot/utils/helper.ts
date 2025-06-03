@@ -102,3 +102,44 @@ export const findLabelById = (
         numericId.toString()
     : numericId.toString();
 };
+
+export const mapToSelectOptions = (
+  items:
+    | Array<{
+        id?: number;
+        name?: string;
+        displayName?: string;
+        label?: string;
+        value?: string;
+      }>
+    | undefined,
+  config: {
+    nameField: 'name' | 'displayName' | 'label';
+    valueField: 'id' | 'value';
+  },
+): Array<{ label: string; value: string }> => {
+  if (!items || items.length === 0) {
+    return [{ label: 'Không có lựa chọn', value: 'NO_OPTION_FALLBACK' }];
+  }
+  return items.map((item) => {
+    const label = item[config.nameField] || item.name || item.label || 'N/A';
+    const value =
+      item[config.valueField]?.toString() ||
+      item.value?.toString() ||
+      'NO_VALUE_FALLBACK';
+    return { label, value };
+  });
+};
+
+export const getSelectedValue = (
+  options: Array<{ label: string; value: string }>,
+): { label: string; value: string } => {
+  return (
+    options[0] || { label: 'Không có lựa chọn', value: 'NO_OPTION_FALLBACK' }
+  );
+};
+
+export const talentApiUrl = {
+  getFormData: 'api/services/app/Public/GetMezonCVFormData',
+  submitCandidateCV: 'api/services/app/Public/CreateMezonInternCV',
+};

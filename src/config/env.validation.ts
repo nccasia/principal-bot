@@ -44,13 +44,9 @@ export class EnvironmentVariables {
   @IsNotEmpty({ message: 'SIGNATURE is missing' })
   SIGNATURE: string;
 
-  @IsString({ message: 'TALENT_API_URL_GET must be a string' })
-  @IsNotEmpty({ message: 'TALENT_API_URL_GET is missing' })
-  TALENT_API_URL_GET: string;
-
-  @IsString({ message: 'TALENT_API_URL_POST must be a string' })
-  @IsNotEmpty({ message: 'TALENT_API_URL_POST is missing' })
-  TALENT_API_URL_POST: string;
+  @IsString({ message: 'TALENT_API_BASE_URL must be a string' })
+  @IsNotEmpty({ message: 'TALENT_API_BASE_URL is missing' })
+  TALENT_API_BASE_URL: string;
 
   @IsString({ message: 'BOT_ID must be a string' })
   @IsNotEmpty({ message: 'BOT_ID is missing' })
